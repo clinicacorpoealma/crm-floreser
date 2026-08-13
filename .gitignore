@@ -1,0 +1,6 @@
+# O Codigo.gs guarda as senhas do CRM e da agenda — ele vive no seu
+# computador e no Apps Script, nunca aqui no GitHub.
+Codigo*.gs
+
+# Configuração local de desenvolvimento
+.claude/

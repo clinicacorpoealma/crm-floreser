@@ -24,6 +24,7 @@
       --taupe: #A39384;
       --carvao: #2D2D2D;
       --branco: #FFFFFF;
+      --linha: #E2DED7;
       --serif: 'Cormorant Garamond', Georgia, serif;
       --sans: 'Montserrat', Calibri, system-ui, sans-serif;
     }
@@ -39,11 +40,12 @@
     }
 
     body {
+      position: relative;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 48px 24px;
+      padding: 48px 24px 58px;
       background: var(--creme);
       color: var(--carvao);
       font-family: var(--sans);
@@ -184,9 +186,212 @@
       color: var(--taupe);
     }
 
+    /* ---------- Cantos: versão e histórico ---------- */
+    /* teal em vez de taupe: no tamanho pequeno, o taupe sobre o creme
+       não alcança o contraste mínimo de leitura */
+    .canto {
+      position: absolute;
+      bottom: 20px;
+      font-family: var(--sans);
+      font-weight: 400;
+      font-size: 10px;
+      letter-spacing: .18em;
+      color: var(--teal);
+      line-height: 1;
+    }
+
+    .canto-versao {
+      right: 24px;
+      text-transform: none;
+    }
+
+    .canto-historico {
+      left: 24px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      margin: -6px -8px;
+      border: none;
+      border-radius: 6px;
+      background: none;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color .18s ease, background .18s ease;
+    }
+
+    .canto-historico svg {
+      flex: 0 0 auto;
+      opacity: .75;
+    }
+
+    @media (hover: hover) {
+      .canto-historico:hover {
+        background: rgba(201, 211, 202, .5);
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+    }
+
+    .canto-historico:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+      color: var(--teal);
+    }
+
+    /* ---------- Histórico de versões ---------- */
+    .historico {
+      width: min(560px, calc(100% - 32px));
+      max-height: min(78vh, 680px);
+      /* o reset de margens da página zera o centralizador do <dialog> */
+      margin: auto;
+      padding: 0;
+      border: none;
+      border-radius: 14px;
+      background: var(--creme);
+      color: var(--carvao);
+      box-shadow: 0 20px 60px rgba(30, 50, 48, .28);
+      overflow: hidden;
+    }
+
+    .historico::backdrop {
+      background: rgba(30, 50, 48, .5);
+    }
+
+    .historico-topo {
+      display: flex;
+      align-items: baseline;
+      gap: 14px;
+      padding: 24px 26px 16px;
+      border-bottom: 1px solid var(--linha);
+      background: var(--creme);
+    }
+
+    .historico-topo h2 {
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 27px;
+      line-height: 1.1;
+      color: var(--teal);
+    }
+
+    .historico-fechar {
+      margin-left: auto;
+      padding: 6px 9px;
+      border: none;
+      border-radius: 6px;
+      background: none;
+      color: var(--teal);
+      font-size: 17px;
+      line-height: 1;
+      cursor: pointer;
+      transition: color .18s ease, background .18s ease;
+    }
+
+    .historico-fechar:hover,
+    .historico-fechar:focus-visible {
+      color: var(--teal);
+      background: rgba(201, 211, 202, .4);
+      outline: none;
+    }
+
+    .historico-corpo {
+      max-height: calc(min(78vh, 680px) - 78px);
+      overflow-y: auto;
+      padding: 4px 26px 26px;
+      overscroll-behavior: contain;
+    }
+
+    .versao-bloco {
+      padding: 22px 0;
+      border-bottom: 1px solid var(--linha);
+    }
+
+    .versao-bloco:last-child {
+      border-bottom: none;
+      padding-bottom: 4px;
+    }
+
+    .versao-bloco h3 {
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 21px;
+      line-height: 1.15;
+      color: var(--teal);
+    }
+
+    .versao-bloco .data {
+      margin-top: 4px;
+      font-weight: 400;
+      font-size: 10px;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--carvao);
+    }
+
+    .versao-bloco h4 {
+      margin-top: 16px;
+      font-weight: 600;
+      font-size: 10.5px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--teal);
+    }
+
+    .versao-bloco ul {
+      margin-top: 7px;
+      padding-left: 16px;
+      list-style: none;
+    }
+
+    .versao-bloco li {
+      position: relative;
+      font-size: 13.5px;
+      line-height: 1.55;
+      padding: 3px 0;
+    }
+
+    .versao-bloco li::before {
+      content: "";
+      position: absolute;
+      left: -13px;
+      top: 12px;
+      width: 5px;
+      height: 1px;
+      background: var(--sage);
+    }
+
     @media (max-width: 560px) {
       body {
-        padding: 44px 20px;
+        padding: 44px 20px 56px;
+      }
+
+      .canto {
+        bottom: 16px;
+        font-size: 9.5px;
+        letter-spacing: .14em;
+      }
+
+      .canto-versao {
+        right: 20px;
+      }
+
+      .canto-historico {
+        left: 20px;
+        padding: 12px 12px;
+        margin: -12px -12px;
+      }
+
+      .historico-topo {
+        padding: 20px 20px 14px;
+      }
+
+      .historico-topo h2 {
+        font-size: 24px;
+      }
+
+      .historico-corpo {
+        padding: 4px 20px 22px;
       }
 
       .acessos {
@@ -267,6 +472,85 @@
     <p class="rodape">Método FloreSer &middot; Uso interno</p>
 
   </main>
+
+  <button class="canto canto-historico" id="abrir-historico" type="button" aria-haspopup="dialog">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+      stroke-linecap="round" aria-hidden="true">
+      <path d="M12 7.5v5l3 1.8" />
+      <path d="M3.6 12a8.4 8.4 0 1 0 2.2-5.7" />
+      <path d="M3.2 4.6v3.4h3.4" />
+    </svg>
+    Histórico
+  </button>
+
+  <span class="canto canto-versao" id="versao-atual"></span>
+
+  <dialog class="historico" id="historico" aria-labelledby="historico-titulo">
+    <div class="historico-topo">
+      <h2 id="historico-titulo">Histórico de versões</h2>
+      <button class="historico-fechar" id="fechar-historico" type="button" aria-label="Fechar histórico">&#10005;</button>
+    </div>
+    <div class="historico-corpo" id="historico-corpo" tabindex="0"></div>
+  </dialog>
+
+  <script src="version.js"></script>
+  <script>
+    (function () {
+      var dados = window.FLORESER;
+      if (!dados) return;
+
+      var dialogo = document.getElementById('historico');
+      var corpo = document.getElementById('historico-corpo');
+
+      document.getElementById('versao-atual').textContent = dados.rotulo;
+
+      function esc(t) {
+        return String(t).replace(/[&<>"]/g, function (c) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        });
+      }
+
+      /* O histórico é montado a partir dos dados: versões novas entram
+         em version.js, sem mexer nesta tela. */
+      corpo.innerHTML = dados.changelog.map(function (v) {
+        var secoes = dados.categorias
+          .filter(function (cat) { return v.mudancas[cat] && v.mudancas[cat].length; })
+          .map(function (cat) {
+            return '<h4>' + esc(cat) + '</h4><ul>' +
+              v.mudancas[cat].map(function (item) { return '<li>' + esc(item) + '</li>'; }).join('') +
+              '</ul>';
+          }).join('');
+        return '<article class="versao-bloco">' +
+          '<h3>v' + esc(v.versao) + ' &mdash; ' + esc(v.codinome) + '</h3>' +
+          '<p class="data">' + esc(v.data) + '</p>' + secoes + '</article>';
+      }).join('');
+
+      var nativo = typeof dialogo.showModal === 'function';
+
+      function abrir() {
+        if (nativo) dialogo.showModal(); else dialogo.setAttribute('open', '');
+        document.body.style.overflow = 'hidden';
+        corpo.scrollTop = 0;
+      }
+
+      function fechar() {
+        if (nativo) dialogo.close(); else dialogo.removeAttribute('open');
+        document.body.style.overflow = '';
+      }
+
+      document.getElementById('abrir-historico').addEventListener('click', abrir);
+      document.getElementById('fechar-historico').addEventListener('click', fechar);
+      dialogo.addEventListener('close', function () { document.body.style.overflow = ''; });
+
+      /* clicar fora do cartão fecha */
+      dialogo.addEventListener('click', function (e) { if (e.target === dialogo) fechar(); });
+
+      /* ESC nos navegadores sem <dialog> nativo */
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !nativo && dialogo.hasAttribute('open')) fechar();
+      });
+    })();
+  </script>
 
 </body>
 

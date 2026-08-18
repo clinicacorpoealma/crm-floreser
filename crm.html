@@ -1,396 +1,389 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CRM FloreSer — Clínica Corpo e Alma</title>
-  <meta name="robots" content="noindex, nofollow">
-  <meta name="theme-color" content="#1E3A3A">
-  <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="apple-touch-icon" href="favicon.png">
-  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
-  <script crossorigin
-    src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
-  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
-  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <style>
-    body {
-      margin: 0;
-      background: #F5F3EE
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRM FloreSer — Clínica Corpo e Alma</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#1E3A3A">
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="favicon.png">
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>body{margin:0;background:#F5F3EE}</style>
 </head>
-
 <body>
-  <div id="root"></div>
+<div id="root"></div>
 
-  <script>
-    /* Endereço do Apps Script publicado (o mesmo que atende a agenda) */
-    var URL_API = "https://script.google.com/macros/s/AKfycbzy9WCfP4l08dn2h2K34uEL6e0mqFBjVMugcHiTc0oUGmpS7gOJjbxs58CB87AoFUw-/exec";
+<script>
+/* Endereco do Apps Script publicado (o mesmo que atende a agenda) */
+var URL_API = "https://script.google.com/macros/s/AKfycbzy9WCfP4l08dn2h2K34uEL6e0mqFBjVMugcHiTc0oUGmpS7gOJjbxs58CB87AoFUw-/exec";
 
-    var SESSAO = { senha: "", rev: 0 };
+var SESSAO = { senha: "", rev: 0 };
 
-    async function chamarAPI(dados) {
-      var resposta = await fetch(URL_API, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(dados),
-        redirect: "follow",
-      });
-      return await resposta.json();
-    }
+async function chamarAPI(dados) {
+  var resposta = await fetch(URL_API, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(dados),
+    redirect: "follow",
+  });
+  return await resposta.json();
+}
 
-    /* Adaptador: o app continua usando window.storage,
-       mas por baixo tudo vai para a planilha do Google. */
-    window.storage = {
-      async get(chave) {
-        var r = await chamarAPI({ acao: "ler", senha: SESSAO.senha });
-        if (!r.ok) throw new Error(r.erro || "falha ao ler");
-        SESSAO.rev = r.rev;
-        return { key: chave, value: JSON.stringify(r.dados), shared: false };
-      },
-      async set(chave, valor) {
-        var r = await chamarAPI({
-          acao: "salvar",
-          senha: SESSAO.senha,
-          rev: SESSAO.rev,
-          dados: JSON.parse(valor),
-        });
-        if (!r.ok) {
-          if (r.erro === "conflito") {
-            alert(
-              "Os dados foram alterados em outro dispositivo enquanto você usava o CRM.\n\n" +
-              "A página será recarregada com a versão mais recente. Pode ser necessário refazer a última alteração."
-            );
-            location.reload();
-          }
-          throw new Error(r.erro || "falha ao salvar");
-        }
-        SESSAO.rev = r.rev;
-        return { key: chave, value: valor, shared: false };
-      },
-      async delete(chave) { return { key: chave, deleted: true, shared: false }; },
-      async list() { return { keys: [], shared: false }; },
-    };
-  </script>
-
-  <script type="text/babel" data-presets="react">
-    const { useState, useEffect, useMemo } = React;
-
-    /* ===== CRM FloreSer — funil comercial + cadência de follow-up ===== */
-
-    const CORES = {
-      floresta: "#1E3A3A",
-      verde: "#3B6E6A",
-      ouro: "#8C7550",
-      areia: "#F5F3EE",
-      branco: "#FFFFFF",
-      atrasado: "#A3543A",
-      borda: "#E5E0D5",
-      suave: "#9A948A",
-    };
-
-    const STORAGE_KEY = "crm-floreser-dados";
-
-    /* ---- Cadências: da mais quente para a mais fria ---- */
-    const CADENCIAS = [
-      { id: "quente", nome: "Quente", padrao: 2 },
-      { id: "morno", nome: "Morno", padrao: 5 },
-      { id: "frio", nome: "Frio", padrao: 15 },
-      { id: "muito_frio", nome: "Muito frio", padrao: 30 },
-    ];
-
-    /* ---- Etapas do funil ----
-       cadencias: quais cadências a etapa aceita, na ordem de esfriamento
-       nivel: até onde o lead chegou no funil (alimenta os indicadores)
-       arquivo: sai do dia a dia, mas continua salvo                      */
-    const ETAPAS = [
-      { id: "nao_responde", nome: "Não responde", cadencias: ["quente", "morno", "frio", "muito_frio"], nivel: 0 },
-      { id: "conversando", nome: "Conversando", cadencias: ["quente"], nivel: 1 },
-      { id: "agendando", nome: "Agendando", cadencias: ["quente"], nivel: 1 },
-      { id: "agendado", nome: "Agendado", cadencias: [], nivel: 2 },
-      { id: "falta", nome: "Falta", cadencias: ["quente"], nivel: 2 },
-      { id: "com_orcamento", nome: "Com orçamento", cadencias: ["quente", "morno"], nivel: 3 },
-      { id: "venda", nome: "Venda", cadencias: [], nivel: 4, arquivo: true },
-      { id: "reprovado", nome: "Reprovado", cadencias: [], nivel: null, arquivo: true },
-    ];
-
-    const MARCOS = ["criadoEm", "dtConversa", "dtAgendamento", "dtComparecimento", "dtVenda"];
-
-    const etapaPor = (id) => ETAPAS.find((e) => e.id === id) || ETAPAS[0];
-    const cadenciaPor = (id) => CADENCIAS.find((c) => c.id === id);
-
-    /* ---- Datas ---- */
-    function hojeISO() {
-      const d = new Date();
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    }
-    function paraData(iso) {
-      if (!iso) return null;
-      const [y, m, d] = String(iso).split("-").map(Number);
-      if (!y || !m || !d) return null;
-      return new Date(y, m - 1, d);
-    }
-    function diasDesde(iso) {
-      const data = paraData(iso);
-      if (!data) return null;
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      return Math.floor((hoje - data) / 86400000);
-    }
-    function formatarData(iso) {
-      if (!iso) return "—";
-      const [y, m, d] = String(iso).split("-");
-      return d && m ? `${d}/${m}/${y}` : "—";
-    }
-    function inicioDaSemana() {
-      const d = new Date();
-      d.setHours(0, 0, 0, 0);
-      d.setDate(d.getDate() - d.getDay());
-      return d;
-    }
-    function inicioDoMes() {
-      const d = new Date();
-      return new Date(d.getFullYear(), d.getMonth(), 1);
-    }
-    function novoId() {
-      return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    }
-
-    const NOMES_MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
-      "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
-
-    function nomeDoMes(chave) {
-      const [ano, mes] = String(chave).split("-").map(Number);
-      if (!ano || !mes) return chave;
-      const nome = NOMES_MESES[mes - 1];
-      return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${ano}`;
-    }
-
-    /* ---- Regras de cadência ---- */
-    function cadenciaValida(etapaId, cadenciaId) {
-      const permitidas = etapaPor(etapaId).cadencias;
-      if (!permitidas.length) return "";
-      return permitidas.includes(cadenciaId) ? cadenciaId : permitidas[0];
-    }
-    function proximaCadencia(etapaId, cadenciaId) {
-      const permitidas = etapaPor(etapaId).cadencias;
-      if (!permitidas.length) return "";
-      const i = permitidas.indexOf(cadenciaId);
-      if (i === -1) return permitidas[0];
-      return permitidas[Math.min(i + 1, permitidas.length - 1)];
-    }
-
-    /* ---- Situação do follow-up ---- */
-    function situacao(lead, dias) {
-      const etapa = etapaPor(lead.etapa);
-      if (etapa.arquivo) return { tipo: "arquivado", texto: "Arquivado", atraso: -9999 };
-      if (!lead.cadencia) return { tipo: "sem-cadencia", texto: "Sem cadência", atraso: -9999 };
-      const intervalo = dias[lead.cadencia] || cadenciaPor(lead.cadencia)?.padrao || 5;
-      const passados = diasDesde(lead.ultimoContato);
-      if (passados === null) return { tipo: "atrasado", texto: "Nunca contatada", atraso: 999 };
-      const restam = intervalo - passados;
-      if (restam < 0) return { tipo: "atrasado", texto: `Atrasado ${-restam}d`, atraso: -restam };
-      if (restam === 0) return { tipo: "hoje", texto: "Contatar hoje", atraso: 0 };
-      return { tipo: "em-dia", texto: `Em ${restam}d`, atraso: -restam };
-    }
-
-    /* ---- Marcos do funil: carimba as datas conforme o lead avança ---- */
-    function aplicarMarcos(lead, etapaId) {
-      const atualizado = { ...lead };
-      if (etapaId === "reprovado") {
-        atualizado.dtReprovado = atualizado.dtReprovado || hojeISO();
-        return atualizado;
-      }
-      const nivel = etapaPor(etapaId).nivel;
-      if (nivel === null) return atualizado;
-      for (let i = 1; i <= nivel; i++) {
-        const campo = MARCOS[i];
-        if (!atualizado[campo]) atualizado[campo] = hojeISO();
-      }
-      return atualizado;
-    }
-
-    function CRMFloreSer() {
-      const [carregando, setCarregando] = useState(true);
-      const [erro, setErro] = useState(null);
-      const [leads, setLeads] = useState([]);
-      const [dias, setDias] = useState(() => CADENCIAS.reduce((a, c) => ({ ...a, [c.id]: c.padrao }), {}));
-      const [aba, setAba] = useState("funil");
-      const [periodo, setPeriodo] = useState("semana");
-      const [mesRef, setMesRef] = useState(() => hojeISO().slice(0, 7));
-      const [filtroEtapa, setFiltroEtapa] = useState("todas");
-      const [busca, setBusca] = useState("");
-      const [editando, setEditando] = useState(null);
-      const [aberto, setAberto] = useState(null);
-      const [importando, setImportando] = useState(false);
-
-      useEffect(() => {
-        (async () => {
-          try {
-            const res = await window.storage.get(STORAGE_KEY);
-            if (res && res.value) {
-              const d = JSON.parse(res.value);
-              if (d.dias) setDias((atual) => ({ ...atual, ...d.dias }));
-              if (d.leads) setLeads(d.leads.map(migrar));
-            }
-          } catch (e) {
-            /* primeiro uso */
-          } finally {
-            setCarregando(false);
-          }
-        })();
-      }, []);
-
-      /* converte cadastros do formato antigo */
-      function migrar(l) {
-        if (l.etapa) return l;
-        const antigo = { c1: "quente", c2: "morno", c3: "frio" };
-        return {
-          ...l,
-          etapa: "nao_responde",
-          cadencia: antigo[l.categoriaId] || "quente",
-          exCliente: false,
-          criadoEm: l.criadoEm || hojeISO(),
-        };
-      }
-
-      async function salvar(novosLeads, novosDias) {
-        const lds = novosLeads ?? leads;
-        const ds = novosDias ?? dias;
-        if (novosLeads) setLeads(novosLeads);
-        if (novosDias) setDias(novosDias);
-        try {
-          await window.storage.set(STORAGE_KEY, JSON.stringify({ leads: lds, dias: ds }));
-          setErro(null);
-        } catch (e) {
-          setErro("Não consegui salvar. Verifique a conexão e tente de novo.");
-        }
-      }
-
-      function salvarLead(dados) {
-        const preparado = aplicarMarcos({ ...dados, cadencia: cadenciaValida(dados.etapa, dados.cadencia) }, dados.etapa);
-        if (dados.id) {
-          salvar(leads.map((l) => (l.id === dados.id ? { ...l, ...preparado } : l)));
-        } else {
-          salvar([...leads, { ...preparado, id: novoId(), criadoEm: preparado.criadoEm || hojeISO() }]);
-        }
-        setEditando(null);
-        setAberto(null);
-      }
-
-      function mudarEtapa(id, etapaId) {
-        salvar(leads.map((l) => {
-          if (l.id !== id) return l;
-          return aplicarMarcos({ ...l, etapa: etapaId, cadencia: cadenciaValida(etapaId, l.cadencia) }, etapaId);
-        }));
-      }
-
-      function mudarCadencia(id, cadenciaId) {
-        salvar(leads.map((l) => (l.id === id ? { ...l, cadencia: cadenciaId } : l)));
-      }
-
-      function alternarExCliente(id) {
-        salvar(leads.map((l) => (l.id === id ? { ...l, exCliente: !l.exCliente } : l)));
-      }
-
-      /* registra contato e esfria um degrau, dentro do limite da etapa */
-      function registrarContato(id) {
-        salvar(leads.map((l) =>
-          l.id === id ? { ...l, ultimoContato: hojeISO(), cadencia: proximaCadencia(l.etapa, l.cadencia) } : l
-        ));
-      }
-
-      function excluirLead(id) {
-        salvar(leads.filter((l) => l.id !== id));
-        setAberto(null);
-        setEditando(null);
-      }
-
-      function importarLeads(novos) {
-        salvar([...leads, ...novos.map((n) => aplicarMarcos({ ...n, id: novoId() }, n.etapa))]);
-        setImportando(false);
-        setAba("leads");
-      }
-
-      const comSituacao = useMemo(() => leads.map((l) => ({ ...l, sit: situacao(l, dias) })), [leads, dias]);
-      const ativos = comSituacao.filter((l) => !etapaPor(l.etapa).arquivo);
-      const arquivados = comSituacao.filter((l) => etapaPor(l.etapa).arquivo);
-
-      const pendentes = ativos
-        .filter((l) => l.sit.tipo === "atrasado" || l.sit.tipo === "hoje")
-        .sort((a, b) => b.sit.atraso - a.sit.atraso);
-
-      const filtrados = ativos
-        .filter((l) => filtroEtapa === "todas" || l.etapa === filtroEtapa)
-        .filter((l) => l.nome.toLowerCase().includes(busca.toLowerCase()))
-        .sort((a, b) => b.sit.atraso - a.sit.atraso);
-
-      const funil = useMemo(() => {
-        let de = null;
-        let ate = null;
-        if (periodo === "semana") {
-          de = inicioDaSemana();
-        } else if (periodo === "mes") {
-          const [ano, mes] = mesRef.split("-").map(Number);
-          de = new Date(ano, mes - 1, 1);
-          ate = new Date(ano, mes, 1);
-        }
-        const dentro = (iso) => {
-          if (!iso) return false;
-          const d = paraData(iso);
-          if (!d) return false;
-          if (de && d < de) return false;
-          if (ate && d >= ate) return false;
-          return true;
-        };
-        const contar = (campo) => leads.filter((l) => dentro(l[campo])).length;
-        const vendas = leads.filter((l) => dentro(l.dtVenda));
-        return {
-          captados: contar("criadoEm"),
-          conversas: contar("dtConversa"),
-          agendamentos: contar("dtAgendamento"),
-          comparecimentos: contar("dtComparecimento"),
-          vendas: vendas.length,
-          porConsulta: vendas.filter((l) => !l.exCliente).length,
-          porRecompra: vendas.filter((l) => l.exCliente).length,
-        };
-      }, [leads, periodo, mesRef]);
-
-      /* meses disponíveis: do primeiro lead captado até o mês atual */
-      const mesesDisponiveis = useMemo(() => {
-        const atual = hojeISO().slice(0, 7);
-        const datas = leads.map((l) => String(l.criadoEm || "").slice(0, 7)).filter((m) => /^\d{4}-\d{2}$/.test(m));
-        const inicio = datas.length ? datas.sort()[0] : atual;
-        const lista = [];
-        let [ano, mes] = inicio.split("-").map(Number);
-        const [anoFim, mesFim] = atual.split("-").map(Number);
-        let guarda = 0;
-        while ((ano < anoFim || (ano === anoFim && mes <= mesFim)) && guarda++ < 120) {
-          lista.push(`${ano}-${String(mes).padStart(2, "0")}`);
-          mes++;
-          if (mes > 12) { mes = 1; ano++; }
-        }
-        return lista.reverse();
-      }, [leads]);
-
-      if (carregando) {
-        return (
-          <div style={{ minHeight: "100vh", background: CORES.areia, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Montserrat', sans-serif", color: CORES.verde }}>
-            Carregando…
-          </div>
+/* Adaptador: o app continua usando window.storage,
+   mas por baixo tudo vai para a planilha do Google. */
+window.storage = {
+  async get(chave) {
+    var r = await chamarAPI({ acao: "ler", senha: SESSAO.senha });
+    if (!r.ok) throw new Error(r.erro || "falha ao ler");
+    SESSAO.rev = r.rev;
+    return { key: chave, value: JSON.stringify(r.dados), shared: false };
+  },
+  async set(chave, valor) {
+    var r = await chamarAPI({
+      acao: "salvar",
+      senha: SESSAO.senha,
+      rev: SESSAO.rev,
+      dados: JSON.parse(valor),
+    });
+    if (!r.ok) {
+      if (r.erro === "conflito") {
+        alert(
+          "Os dados foram alterados em outro dispositivo enquanto você usava o CRM.\n\n" +
+          "A página será recarregada com a versão mais recente. Pode ser necessário refazer a última alteração."
         );
+        location.reload();
       }
+      throw new Error(r.erro || "falha ao salvar");
+    }
+    SESSAO.rev = r.rev;
+    return { key: chave, value: valor, shared: false };
+  },
+  async delete(chave) { return { key: chave, deleted: true, shared: false }; },
+  async list() { return { keys: [], shared: false }; },
+};
+</script>
 
-      const rotuloPeriodo =
-        periodo === "semana" ? "nesta semana"
-          : periodo === "mes" ? `em ${nomeDoMes(mesRef).toLowerCase()}`
-            : "em todo o período";
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo } = React;
 
-      return (
-        <div style={{ minHeight: "100vh", background: CORES.areia, fontFamily: "'Montserrat', -apple-system, sans-serif", color: CORES.floresta }}>
-          <style>{`
+/* ===== CRM FloreSer — funil comercial + cadência de follow-up ===== */
+
+const CORES = {
+  floresta: "#1E3A3A",
+  verde: "#3B6E6A",
+  ouro: "#8C7550",
+  areia: "#F5F3EE",
+  branco: "#FFFFFF",
+  atrasado: "#A3543A",
+  borda: "#E5E0D5",
+  suave: "#9A948A",
+};
+
+const STORAGE_KEY = "crm-floreser-dados";
+
+/* ---- Cadências: da mais quente para a mais fria ---- */
+const CADENCIAS = [
+  { id: "quente", nome: "Quente", padrao: 2 },
+  { id: "morno", nome: "Morno", padrao: 5 },
+  { id: "frio", nome: "Frio", padrao: 15 },
+  { id: "muito_frio", nome: "Muito frio", padrao: 30 },
+];
+
+/* ---- Etapas do funil ----
+   cadencias: quais cadências a etapa aceita, na ordem de esfriamento
+   nivel: até onde o lead chegou no funil (alimenta os indicadores)
+   arquivo: sai do dia a dia, mas continua salvo                      */
+const ETAPAS = [
+  { id: "nao_responde", nome: "Não responde", cadencias: ["quente", "morno", "frio", "muito_frio"], nivel: 0 },
+  { id: "conversando", nome: "Conversando", cadencias: ["quente"], nivel: 1 },
+  { id: "nurturing", nome: "Nurturing", cadencias: ["frio", "muito_frio"], nivel: 1 },
+  { id: "agendando", nome: "Agendando", cadencias: ["quente"], nivel: 1 },
+  { id: "agendado", nome: "Agendado", cadencias: [], nivel: 2 },
+  { id: "falta", nome: "Falta", cadencias: ["quente"], nivel: 2 },
+  { id: "com_orcamento", nome: "Com orçamento", cadencias: ["quente", "morno"], nivel: 3 },
+  { id: "venda", nome: "Venda", cadencias: [], nivel: 4, arquivo: true },
+  { id: "venda_reprovada", nome: "Venda reprovada", cadencias: [], nivel: 3, arquivo: true, encerra: true },
+  { id: "recusado", nome: "Recusado", cadencias: [], nivel: 1, arquivo: true, encerra: true },
+];
+
+const MARCOS = ["criadoEm", "dtConversa", "dtAgendamento", "dtComparecimento", "dtVenda"];
+
+const etapaPor = (id) => ETAPAS.find((e) => e.id === id) || ETAPAS[0];
+const cadenciaPor = (id) => CADENCIAS.find((c) => c.id === id);
+
+/* ---- Datas ---- */
+function hojeISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+function paraData(iso) {
+  if (!iso) return null;
+  const [y, m, d] = String(iso).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+function diasDesde(iso) {
+  const data = paraData(iso);
+  if (!data) return null;
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  return Math.floor((hoje - data) / 86400000);
+}
+function formatarData(iso) {
+  if (!iso) return "—";
+  const [y, m, d] = String(iso).split("-");
+  return d && m ? `${d}/${m}/${y}` : "—";
+}
+function inicioDaSemana() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  d.setDate(d.getDate() - d.getDay());
+  return d;
+}
+function inicioDoMes() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+function novoId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+const NOMES_MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+function nomeDoMes(chave) {
+  const [ano, mes] = String(chave).split("-").map(Number);
+  if (!ano || !mes) return chave;
+  const nome = NOMES_MESES[mes - 1];
+  return `${nome.charAt(0).toUpperCase()}${nome.slice(1)} de ${ano}`;
+}
+
+/* ---- Regras de cadência ---- */
+function cadenciaValida(etapaId, cadenciaId) {
+  const permitidas = etapaPor(etapaId).cadencias;
+  if (!permitidas.length) return "";
+  return permitidas.includes(cadenciaId) ? cadenciaId : permitidas[0];
+}
+function proximaCadencia(etapaId, cadenciaId) {
+  const permitidas = etapaPor(etapaId).cadencias;
+  if (!permitidas.length) return "";
+  const i = permitidas.indexOf(cadenciaId);
+  if (i === -1) return permitidas[0];
+  return permitidas[Math.min(i + 1, permitidas.length - 1)];
+}
+
+/* ---- Situação do follow-up ---- */
+function situacao(lead, dias) {
+  const etapa = etapaPor(lead.etapa);
+  if (etapa.arquivo) return { tipo: "arquivado", texto: "Arquivado", atraso: -9999 };
+  if (!lead.cadencia) return { tipo: "sem-cadencia", texto: "Sem cadência", atraso: -9999 };
+  const intervalo = dias[lead.cadencia] || cadenciaPor(lead.cadencia)?.padrao || 5;
+  const passados = diasDesde(lead.ultimoContato);
+  if (passados === null) return { tipo: "atrasado", texto: "Nunca contatada", atraso: 999 };
+  const restam = intervalo - passados;
+  if (restam < 0) return { tipo: "atrasado", texto: `Atrasado ${-restam}d`, atraso: -restam };
+  if (restam === 0) return { tipo: "hoje", texto: "Contatar hoje", atraso: 0 };
+  return { tipo: "em-dia", texto: `Em ${restam}d`, atraso: -restam };
+}
+
+/* ---- Marcos do funil: carimba as datas conforme o lead avança ---- */
+function aplicarMarcos(lead, etapaId) {
+  const etapa = etapaPor(etapaId);
+  const atualizado = { ...lead };
+  if (etapa.encerra) atualizado.dtReprovado = atualizado.dtReprovado || hojeISO();
+  const nivel = etapa.nivel;
+  if (nivel === null || nivel === undefined) return atualizado;
+  for (let i = 1; i <= nivel; i++) {
+    const campo = MARCOS[i];
+    if (!atualizado[campo]) atualizado[campo] = hojeISO();
+  }
+  return atualizado;
+}
+
+function CRMFloreSer() {
+  const [carregando, setCarregando] = useState(true);
+  const [erro, setErro] = useState(null);
+  const [leads, setLeads] = useState([]);
+  const [dias, setDias] = useState(() => CADENCIAS.reduce((a, c) => ({ ...a, [c.id]: c.padrao }), {}));
+  const [aba, setAba] = useState("funil");
+  const [periodo, setPeriodo] = useState("semana");
+  const [mesRef, setMesRef] = useState(() => hojeISO().slice(0, 7));
+  const [filtroEtapa, setFiltroEtapa] = useState("todas");
+  const [busca, setBusca] = useState("");
+  const [editando, setEditando] = useState(null);
+  const [aberto, setAberto] = useState(null);
+  const [importando, setImportando] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get(STORAGE_KEY);
+        if (res && res.value) {
+          const d = JSON.parse(res.value);
+          if (d.dias) setDias((atual) => ({ ...atual, ...d.dias }));
+          if (d.leads) setLeads(d.leads.map(migrar));
+        }
+      } catch (e) {
+        /* primeiro uso */
+      } finally {
+        setCarregando(false);
+      }
+    })();
+  }, []);
+
+  /* converte cadastros do formato antigo */
+  function migrar(l) {
+    if (l.etapa === "reprovado") return { ...l, etapa: "recusado" };
+    if (l.etapa) return l;
+    const antigo = { c1: "quente", c2: "morno", c3: "frio" };
+    return {
+      ...l,
+      etapa: "nao_responde",
+      cadencia: antigo[l.categoriaId] || "quente",
+      exCliente: false,
+      criadoEm: l.criadoEm || hojeISO(),
+    };
+  }
+
+  async function salvar(novosLeads, novosDias) {
+    const lds = novosLeads ?? leads;
+    const ds = novosDias ?? dias;
+    if (novosLeads) setLeads(novosLeads);
+    if (novosDias) setDias(novosDias);
+    try {
+      await window.storage.set(STORAGE_KEY, JSON.stringify({ leads: lds, dias: ds }));
+      setErro(null);
+    } catch (e) {
+      setErro("Não consegui salvar. Verifique a conexão e tente de novo.");
+    }
+  }
+
+  function salvarLead(dados) {
+    const preparado = aplicarMarcos({ ...dados, cadencia: cadenciaValida(dados.etapa, dados.cadencia) }, dados.etapa);
+    if (dados.id) {
+      salvar(leads.map((l) => (l.id === dados.id ? { ...l, ...preparado } : l)));
+    } else {
+      salvar([...leads, { ...preparado, id: novoId(), criadoEm: preparado.criadoEm || hojeISO() }]);
+    }
+    setEditando(null);
+    setAberto(null);
+  }
+
+  function mudarEtapa(id, etapaId) {
+    salvar(leads.map((l) => {
+      if (l.id !== id) return l;
+      return aplicarMarcos({ ...l, etapa: etapaId, cadencia: cadenciaValida(etapaId, l.cadencia) }, etapaId);
+    }));
+  }
+
+  function mudarCadencia(id, cadenciaId) {
+    salvar(leads.map((l) => (l.id === id ? { ...l, cadencia: cadenciaId } : l)));
+  }
+
+  function alternarExCliente(id) {
+    salvar(leads.map((l) => (l.id === id ? { ...l, exCliente: !l.exCliente } : l)));
+  }
+
+  /* registra contato e esfria um degrau, dentro do limite da etapa */
+  function registrarContato(id) {
+    salvar(leads.map((l) =>
+      l.id === id ? { ...l, ultimoContato: hojeISO(), cadencia: proximaCadencia(l.etapa, l.cadencia) } : l
+    ));
+  }
+
+  function excluirLead(id) {
+    salvar(leads.filter((l) => l.id !== id));
+    setAberto(null);
+    setEditando(null);
+  }
+
+  function importarLeads(novos) {
+    salvar([...leads, ...novos.map((n) => aplicarMarcos({ ...n, id: novoId() }, n.etapa))]);
+    setImportando(false);
+    setAba("leads");
+  }
+
+  const comSituacao = useMemo(() => leads.map((l) => ({ ...l, sit: situacao(l, dias) })), [leads, dias]);
+  const ativos = comSituacao.filter((l) => !etapaPor(l.etapa).arquivo);
+  const arquivados = comSituacao.filter((l) => etapaPor(l.etapa).arquivo);
+
+  const pendentes = ativos
+    .filter((l) => l.sit.tipo === "atrasado" || l.sit.tipo === "hoje")
+    .sort((a, b) => b.sit.atraso - a.sit.atraso);
+
+  const filtrados = ativos
+    .filter((l) => filtroEtapa === "todas" || l.etapa === filtroEtapa)
+    .filter((l) => l.nome.toLowerCase().includes(busca.toLowerCase()))
+    .sort((a, b) => b.sit.atraso - a.sit.atraso);
+
+  const funil = useMemo(() => {
+    let de = null;
+    let ate = null;
+    if (periodo === "semana") {
+      de = inicioDaSemana();
+    } else if (periodo === "mes") {
+      const [ano, mes] = mesRef.split("-").map(Number);
+      de = new Date(ano, mes - 1, 1);
+      ate = new Date(ano, mes, 1);
+    }
+    const dentro = (iso) => {
+      if (!iso) return false;
+      const d = paraData(iso);
+      if (!d) return false;
+      if (de && d < de) return false;
+      if (ate && d >= ate) return false;
+      return true;
+    };
+    const contar = (campo) => leads.filter((l) => dentro(l[campo])).length;
+    const vendas = leads.filter((l) => dentro(l.dtVenda));
+    return {
+      captados: contar("criadoEm"),
+      conversas: contar("dtConversa"),
+      agendamentos: contar("dtAgendamento"),
+      comparecimentos: contar("dtComparecimento"),
+      vendas: vendas.length,
+      porConsulta: vendas.filter((l) => !l.exCliente).length,
+      porRecompra: vendas.filter((l) => l.exCliente).length,
+    };
+  }, [leads, periodo, mesRef]);
+
+  /* meses disponíveis: do primeiro lead captado até o mês atual */
+  const mesesDisponiveis = useMemo(() => {
+    const atual = hojeISO().slice(0, 7);
+    const datas = leads.map((l) => String(l.criadoEm || "").slice(0, 7)).filter((m) => /^\d{4}-\d{2}$/.test(m));
+    const inicio = datas.length ? datas.sort()[0] : atual;
+    const lista = [];
+    let [ano, mes] = inicio.split("-").map(Number);
+    const [anoFim, mesFim] = atual.split("-").map(Number);
+    let guarda = 0;
+    while ((ano < anoFim || (ano === anoFim && mes <= mesFim)) && guarda++ < 120) {
+      lista.push(`${ano}-${String(mes).padStart(2, "0")}`);
+      mes++;
+      if (mes > 12) { mes = 1; ano++; }
+    }
+    return lista.reverse();
+  }, [leads]);
+
+  if (carregando) {
+    return (
+      <div style={{ minHeight: "100vh", background: CORES.areia, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Montserrat', sans-serif", color: CORES.verde }}>
+        Carregando…
+      </div>
+    );
+  }
+
+  const rotuloPeriodo =
+    periodo === "semana" ? "nesta semana"
+      : periodo === "mes" ? `em ${nomeDoMes(mesRef).toLowerCase()}`
+        : "em todo o período";
+
+  return (
+    <div style={{ minHeight: "100vh", background: CORES.areia, fontFamily: "'Montserrat', -apple-system, sans-serif", color: CORES.floresta }}>
+      <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Montserrat:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
         input, select, textarea, button { font-family: 'Montserrat', sans-serif; }
@@ -399,774 +392,763 @@
         @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
       `}</style>
 
-          <header style={{ background: CORES.floresta, color: CORES.areia, padding: "26px 20px 18px" }}>
-            <div style={{ maxWidth: 760, margin: "0 auto" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <div style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "#C9BFA8" }}>
-                  Clínica Corpo e Alma
-                </div>
-                <a href="index.html" style={{ marginLeft: "auto", fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#C9BFA8", textDecoration: "none" }}>
-                  ‹ Início
-                </a>
-              </div>
-              <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 32, margin: "3px 0 0", lineHeight: 1.1 }}>
-                CRM Flore<span style={{ fontStyle: "italic", color: "#D8C9A5" }}>Ser</span>
-              </h1>
-              <nav style={{ display: "flex", gap: 6, marginTop: 18, flexWrap: "wrap" }}>
-                {[
-                  { id: "funil", rotulo: "Funil" },
-                  { id: "hoje", rotulo: `Follow-ups${pendentes.length ? ` (${pendentes.length})` : ""}` },
-                  { id: "leads", rotulo: `Leads (${ativos.length})` },
-                  { id: "config", rotulo: "Cadências" },
-                ].map((t) => (
-                  <button key={t.id} onClick={() => setAba(t.id)}
-                    style={{
-                      border: "none", borderRadius: 20, padding: "8px 15px", fontSize: 13, fontWeight: 600,
-                      background: aba === t.id ? CORES.areia : "rgba(245,243,238,0.12)",
-                      color: aba === t.id ? CORES.floresta : CORES.areia
-                    }}>
-                    {t.rotulo}
-                  </button>
-                ))}
-              </nav>
+      <header style={{ background: CORES.floresta, color: CORES.areia, padding: "26px 20px 18px" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "#C9BFA8" }}>
+              Clínica Corpo e Alma
             </div>
-          </header>
-
-          <main style={{ maxWidth: 760, margin: "0 auto", padding: "20px 16px 80px" }}>
-            {erro && (
-              <div style={{ background: "#F3E2DC", color: CORES.atrasado, padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
-                {erro}
-                <button onClick={() => setErro(null)} style={{ float: "right", border: "none", background: "none", color: CORES.atrasado, fontWeight: 700 }}>✕</button>
-              </div>
-            )}
-
-            {/* ===== FUNIL ===== */}
-            {aba === "funil" && (
-              <section>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 10, marginBottom: 6 }}>
-                  <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 25, fontWeight: 600, margin: 0 }}>Funil comercial</h2>
-                  <div style={{ display: "flex", gap: 4 }}>
-                    {[["semana", "Semana"], ["mes", "Mês"], ["tudo", "Tudo"]].map(([id, txt]) => (
-                      <button key={id} onClick={() => setPeriodo(id)}
-                        style={{
-                          border: `1.5px solid ${periodo === id ? CORES.verde : "#D8D2C4"}`, background: periodo === id ? CORES.verde : "none",
-                          color: periodo === id ? CORES.branco : CORES.floresta, borderRadius: 20, padding: "5px 13px", fontSize: 12, fontWeight: 600
-                        }}>
-                        {txt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {periodo === "mes" && (
-                  <select value={mesRef} onChange={(e) => setMesRef(e.target.value)}
-                    style={{
-                      width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #D8D2C4",
-                      fontSize: 14, background: CORES.branco, marginBottom: 10, color: CORES.floresta
-                    }}>
-                    {mesesDisponiveis.map((m) => <option key={m} value={m}>{nomeDoMes(m)}</option>)}
-                  </select>
-                )}
-                <p style={{ fontSize: 12.5, color: CORES.suave, margin: "0 0 18px" }}>
-                  Cada etapa conta os leads que passaram por ela {rotuloPeriodo}, mesmo os que já avançaram depois.
-                </p>
-
-                <GraficoFunil funil={funil} mostrarPercentual={periodo === "tudo"} />
-
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
-                  <Indicador rotulo="Vendas por consulta" valor={funil.porConsulta} nota="Cliente nova" />
-                  <Indicador rotulo="Vendas por recompra" valor={funil.porRecompra} nota="Ex-cliente" />
-                </div>
-
-                <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 21, fontWeight: 600, margin: "26px 0 10px" }}>
-                  Onde estão os leads agora
-                </h3>
-                <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "6px 16px" }}>
-                  {ETAPAS.filter((e) => !e.arquivo).map((e) => {
-                    const qtd = ativos.filter((l) => l.etapa === e.id).length;
-                    return (
-                      <button key={e.id} onClick={() => { setFiltroEtapa(e.id); setAba("leads"); }}
-                        style={{
-                          display: "flex", justifyContent: "space-between", width: "100%", border: "none", background: "none",
-                          padding: "10px 0", borderBottom: `1px solid ${CORES.areia}`, fontSize: 14, color: CORES.floresta, textAlign: "left"
-                        }}>
-                        <span>{e.nome}</span>
-                        <strong style={{ color: qtd ? CORES.verde : CORES.suave }}>{qtd}</strong>
-                      </button>
-                    );
-                  })}
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", fontSize: 14, color: CORES.suave }}>
-                    <span>Ex-clientes na base</span>
-                    <strong>{leads.filter((l) => l.exCliente).length}</strong>
-                  </div>
-                </div>
-              </section>
-            )}
-
-            {/* ===== FOLLOW-UPS ===== */}
-            {aba === "hoje" && (
-              <section>
-                <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 25, fontWeight: 600, margin: "6px 0 4px" }}>
-                  Quem precisa de você hoje
-                </h2>
-                <p style={{ fontSize: 13, color: CORES.suave, margin: "0 0 18px" }}>
-                  Ao registrar o contato, o lead esfria um degrau — dentro do limite que a etapa permite.
-                </p>
-                {pendentes.length === 0 ? (
-                  <Vazio titulo="Tudo em dia" texto="Nenhum lead aguardando contato agora." />
-                ) : (
-                  pendentes.map((l) => (
-                    <CartaoLead key={l.id} lead={l} aoAbrir={() => setAberto(l)} aoContatar={() => registrarContato(l.id)} />
-                  ))
-                )}
-              </section>
-            )}
-
-            {/* ===== LEADS ===== */}
-            {aba === "leads" && (
-              <section>
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 16px" }}>
-                  <input placeholder="Buscar por nome…" value={busca} onChange={(e) => setBusca(e.target.value)}
-                    style={{ flex: "1 1 150px", padding: "10px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, background: CORES.branco }} />
-                  <select value={filtroEtapa} onChange={(e) => setFiltroEtapa(e.target.value)}
-                    style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, background: CORES.branco }}>
-                    <option value="todas">Todas as etapas</option>
-                    {ETAPAS.filter((e) => !e.arquivo).map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                  </select>
-                  <button onClick={() => setEditando("novo")}
-                    style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: CORES.verde, color: CORES.branco, fontWeight: 600, fontSize: 14 }}>
-                    + Novo lead
-                  </button>
-                  <button onClick={() => setImportando(true)}
-                    style={{ padding: "10px 18px", borderRadius: 8, border: `1.5px solid ${CORES.ouro}`, background: "none", color: CORES.ouro, fontWeight: 600, fontSize: 14 }}>
-                    Importar planilha
-                  </button>
-                </div>
-                {filtrados.length === 0 ? (
-                  <Vazio titulo="Nenhum lead aqui" texto="Cadastre um novo lead ou importe sua planilha." />
-                ) : (
-                  filtrados.map((l) => (
-                    <CartaoLead key={l.id} lead={l} aoAbrir={() => setAberto(l)} aoContatar={() => registrarContato(l.id)} />
-                  ))
-                )}
-              </section>
-            )}
-
-            {/* ===== ARQUIVO ===== */}
-            {aba === "arquivo" && (
-              <section>
-                <button onClick={() => setAba("funil")}
-                  style={{ border: "none", background: "none", color: CORES.verde, fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 10 }}>
-                  ← Voltar
-                </button>
-                <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 25, fontWeight: 600, margin: "6px 0 4px" }}>Arquivo</h2>
-                <p style={{ fontSize: 13, color: CORES.suave, margin: "0 0 18px" }}>
-                  Vendas e reprovados saem do dia a dia, mas continuam salvos e contando nos indicadores.
-                </p>
-                {arquivados.length === 0 ? (
-                  <Vazio titulo="Arquivo vazio" texto="Nada marcado como venda ou reprovado ainda." />
-                ) : (
-                  arquivados
-                    .slice()
-                    .sort((a, b) => String(b.dtVenda || b.dtReprovado || "").localeCompare(String(a.dtVenda || a.dtReprovado || "")))
-                    .map((l) => <CartaoLead key={l.id} lead={l} aoAbrir={() => setAberto(l)} semContato />)
-                )}
-              </section>
-            )}
-
-            {/* ===== CADÊNCIAS ===== */}
-            {aba === "config" && (
-              <section>
-                <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 25, fontWeight: 600, margin: "6px 0 4px" }}>Cadências</h2>
-                <p style={{ fontSize: 13, color: CORES.suave, margin: "0 0 18px" }}>
-                  De quantos em quantos dias você entra em contato em cada temperatura.
-                </p>
-                {CADENCIAS.map((c) => (
-                  <div key={c.id} style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "12px 16px", marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ flex: 1, fontWeight: 600, fontSize: 15 }}>{c.nome}</span>
-                    <span style={{ fontSize: 13, color: CORES.suave }}>a cada</span>
-                    <input type="number" min="1" value={dias[c.id]}
-                      onChange={(e) => salvar(null, { ...dias, [c.id]: Math.max(1, Number(e.target.value) || 1) })}
-                      style={{ width: 70, padding: "8px 10px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, textAlign: "center" }} />
-                    <span style={{ fontSize: 13, color: CORES.suave }}>dias</span>
-                  </div>
-                ))}
-
-                <div style={{ background: "#EDEAE0", borderRadius: 12, padding: "14px 16px", marginTop: 18 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: CORES.ouro, marginBottom: 10 }}>
-                    Até onde cada etapa pode esfriar
-                  </div>
-                  {ETAPAS.map((e) => (
-                    <div key={e.id} style={{ fontSize: 13, padding: "5px 0", display: "flex", justifyContent: "space-between", gap: 12 }}>
-                      <span style={{ fontWeight: 600 }}>{e.nome}</span>
-                      <span style={{ color: CORES.verde, textAlign: "right" }}>
-                        {e.arquivo ? "Arquivado" : e.cadencias.length === 0 ? "Sem cadência" : e.cadencias.map((c) => cadenciaPor(c).nome).join(" → ")}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {aba !== "arquivo" && (
-              <div style={{ textAlign: "right", marginTop: 34 }}>
-                <button onClick={() => setAba("arquivo")}
-                  style={{ border: "none", background: "none", color: "#B4AFA4", fontSize: 12, padding: "4px 0" }}>
-                  Arquivo ({arquivados.length}) →
-                </button>
-              </div>
-            )}
-          </main>
-
-          {aberto && !editando && (
-            <Modal aoFechar={() => setAberto(null)}>
-              <DetalheLead
-                lead={comSituacao.find((l) => l.id === aberto.id) || aberto}
-                aoEditar={() => setEditando(aberto)}
-                aoContatar={() => registrarContato(aberto.id)}
-                aoMudarEtapa={(e) => mudarEtapa(aberto.id, e)}
-                aoMudarCadencia={(c) => mudarCadencia(aberto.id, c)}
-                aoAlternarEx={() => alternarExCliente(aberto.id)}
-                aoExcluir={() => excluirLead(aberto.id)}
-              />
-            </Modal>
-          )}
-
-          {importando && (
-            <Modal aoFechar={() => setImportando(false)}>
-              <ImportarPlanilha aoImportar={importarLeads} aoCancelar={() => setImportando(false)} />
-            </Modal>
-          )}
-
-          {editando && (
-            <Modal aoFechar={() => setEditando(null)}>
-              <FormularioLead lead={editando === "novo" ? null : editando} aoSalvar={salvarLead} aoCancelar={() => setEditando(null)} />
-            </Modal>
-          )}
-        </div>
-      );
-    }
-
-    /* ==== Gráfico de funil ==== */
-    function GraficoFunil({ funil, mostrarPercentual }) {
-      const etapas = [
-        { rotulo: "Leads captados", valor: funil.captados },
-        { rotulo: "Conversas", valor: funil.conversas },
-        { rotulo: "Agendamentos", valor: funil.agendamentos },
-        { rotulo: "Comparecimentos", valor: funil.comparecimentos },
-        { rotulo: "Vendas", valor: funil.vendas },
-      ];
-      const maximo = Math.max(...etapas.map((e) => e.valor), 1);
-      const tons = ["#1E3A3A", "#2E5654", "#3B6E6A", "#6E8C6A", "#8C7550"];
-
-      return (
-        <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "18px 16px" }}>
-          {etapas.map((e, i) => {
-            const largura = Math.max((e.valor / maximo) * 100, e.valor > 0 ? 16 : 8);
-            const anterior = i > 0 ? etapas[i - 1].valor : null;
-            const conv = anterior ? Math.round((e.valor / anterior) * 100) : null;
-            return (
-              <div key={e.rotulo} style={{ marginBottom: i === etapas.length - 1 ? 0 : 10 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
-                  <span style={{ fontWeight: 600 }}>{e.rotulo}</span>
-                  {mostrarPercentual && conv !== null && anterior > 0 && (
-                    <span style={{ color: CORES.suave }}>{conv}% da etapa anterior</span>
-                  )}
-                </div>
-                <div style={{ display: "flex", justifyContent: "center" }}>
-                  <div style={{
-                    width: `${largura}%`, background: tons[i], color: CORES.branco, borderRadius: 6,
-                    padding: "9px 12px", textAlign: "center", fontWeight: 700, fontSize: 16, minWidth: 54, transition: "width 0.3s"
-                  }}>
-                    {e.valor}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      );
-    }
-
-    function Indicador({ rotulo, valor, nota }) {
-      return (
-        <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "14px 16px" }}>
-          <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: CORES.suave }}>{rotulo}</div>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 600, color: CORES.floresta, lineHeight: 1.1, marginTop: 2 }}>{valor}</div>
-          <div style={{ fontSize: 12, color: CORES.verde }}>{nota}</div>
-        </div>
-      );
-    }
-
-    function Vazio({ titulo, texto }) {
-      return (
-        <div style={{ background: CORES.branco, borderRadius: 12, padding: "36px 20px", textAlign: "center", border: `1px solid ${CORES.borda}` }}>
-          <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: CORES.verde }}>{titulo}</div>
-          <div style={{ fontSize: 13, color: CORES.suave, marginTop: 6 }}>{texto}</div>
-        </div>
-      );
-    }
-
-    /* ==== Cartão ==== */
-    function Etiqueta({ texto, cor, fundo }) {
-      return (
-        <span style={{
-          fontSize: 10.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
-          color: cor, background: fundo, padding: "3px 8px", borderRadius: 10, whiteSpace: "nowrap"
-        }}>
-          {texto}
-        </span>
-      );
-    }
-
-    function CartaoLead({ lead, aoAbrir, aoContatar, semContato }) {
-      const etapa = etapaPor(lead.etapa);
-      const cad = cadenciaPor(lead.cadencia);
-      const s = lead.sit;
-      const corSit = s.tipo === "atrasado" ? CORES.atrasado : s.tipo === "hoje" ? CORES.ouro : CORES.verde;
-
-      return (
-        <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "13px 15px", marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
-          <button onClick={aoAbrir} style={{ flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, fontSize: 15, color: CORES.floresta }}>{lead.nome}</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 5, alignItems: "center" }}>
-              <Etiqueta texto={etapa.nome} cor={CORES.floresta} fundo="#E3EAE8" />
-              {lead.exCliente && <Etiqueta texto="Ex-cliente" cor={CORES.ouro} fundo="#F2ECDE" />}
-              {cad && <Etiqueta texto={cad.nome} cor={CORES.verde} fundo="#EAF0EE" />}
-              {!semContato && <span style={{ fontSize: 12, fontWeight: 600, color: corSit }}>{s.texto}</span>}
-            </div>
-          </button>
-          {!semContato && lead.cadencia && (
-            <button onClick={aoContatar} title="Registrar contato feito hoje"
-              style={{ border: `1.5px solid ${CORES.verde}`, background: "none", color: CORES.verde, borderRadius: 8, padding: "8px 11px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
-              Contatei ✓
-            </button>
-          )}
-        </div>
-      );
-    }
-
-    /* ==== Detalhe ==== */
-    function DetalheLead({ lead, aoEditar, aoContatar, aoMudarEtapa, aoMudarCadencia, aoAlternarEx, aoExcluir }) {
-      const [confirmando, setConfirmando] = useState(false);
-      const etapa = etapaPor(lead.etapa);
-      const tel = (lead.whatsapp || "").replace(/\D/g, "");
-      const campo = { width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, background: CORES.branco, marginTop: 4 };
-      const rot = { fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: CORES.suave };
-
-      return (
-        <div>
-          <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 600, margin: "0 0 10px" }}>{lead.nome}</h3>
-
-          <label style={{ display: "block", marginBottom: 12 }}>
-            <span style={rot}>Etapa do funil</span>
-            <select value={lead.etapa} onChange={(e) => aoMudarEtapa(e.target.value)} style={campo}>
-              {ETAPAS.map((e) => <option key={e.id} value={e.id}>{e.nome}{e.arquivo ? " (arquiva)" : ""}</option>)}
-            </select>
-          </label>
-
-          {etapa.cadencias.length > 0 && (
-            <label style={{ display: "block", marginBottom: 12 }}>
-              <span style={rot}>Cadência</span>
-              <select value={lead.cadencia || etapa.cadencias[0]} onChange={(e) => aoMudarCadencia(e.target.value)} style={campo}>
-                {etapa.cadencias.map((c) => <option key={c} value={c}>{cadenciaPor(c).nome}</option>)}
-              </select>
-            </label>
-          )}
-
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, marginBottom: 14, cursor: "pointer" }}>
-            <input type="checkbox" checked={!!lead.exCliente} onChange={aoAlternarEx} style={{ width: 17, height: 17 }} />
-            Ex-cliente (a venda dela conta como recompra)
-          </label>
-
-          <dl style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.7 }}>
-            <Linha rotulo="WhatsApp" valor={lead.whatsapp || "—"} />
-            <Linha rotulo="Interesse" valor={lead.interesse || "—"} />
-            <Linha rotulo="Último contato" valor={formatarData(lead.ultimoContato)} />
-            <Linha rotulo="Situação" valor={lead.sit?.texto || "—"} />
-            <Linha rotulo="Captada em" valor={formatarData(lead.criadoEm)} />
-            {lead.dtConversa && <Linha rotulo="1ª conversa" valor={formatarData(lead.dtConversa)} />}
-            {lead.dtAgendamento && <Linha rotulo="Agendamento" valor={formatarData(lead.dtAgendamento)} />}
-            {lead.dtComparecimento && <Linha rotulo="Comparecimento" valor={formatarData(lead.dtComparecimento)} />}
-            {lead.dtVenda && <Linha rotulo="Venda" valor={formatarData(lead.dtVenda)} />}
-            {lead.dtReprovado && <Linha rotulo="Reprovado em" valor={formatarData(lead.dtReprovado)} />}
-            {lead.observacoes && (
-              <div style={{ marginTop: 10 }}>
-                <div style={rot}>Observações</div>
-                <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{lead.observacoes}</div>
-              </div>
-            )}
-          </dl>
-
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-            {tel && (
-              <a href={`https://wa.me/55${tel}`} target="_blank" rel="noreferrer"
-                style={{ background: CORES.verde, color: CORES.branco, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-                Abrir WhatsApp
-              </a>
-            )}
-            {lead.cadencia && (
-              <button onClick={aoContatar} style={{ border: `1.5px solid ${CORES.verde}`, background: "none", color: CORES.verde, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600 }}>
-                Contatei hoje ✓
-              </button>
-            )}
-            <button onClick={aoEditar} style={{ border: "1.5px solid #C9C2B2", background: "none", color: CORES.floresta, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600 }}>
-              Editar
-            </button>
-            {!confirmando ? (
-              <button onClick={() => setConfirmando(true)} style={{ border: "none", background: "none", color: CORES.atrasado, fontSize: 13, fontWeight: 600, marginLeft: "auto" }}>
-                Excluir
-              </button>
-            ) : (
-              <button onClick={aoExcluir} style={{ border: "none", background: CORES.atrasado, color: CORES.branco, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, marginLeft: "auto" }}>
-                Confirmar exclusão
-              </button>
-            )}
+            <a href="index.html" style={{ marginLeft: "auto", fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#C9BFA8", textDecoration: "none" }}>
+              ‹ Início
+            </a>
           </div>
+          <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 32, margin: "3px 0 0", lineHeight: 1.1 }}>
+            CRM Flore<span style={{ fontStyle: "italic", color: "#D8C9A5" }}>Ser</span>
+          </h1>
+          <nav style={{ display: "flex", gap: 6, marginTop: 18, flexWrap: "wrap" }}>
+            {[
+              { id: "funil", rotulo: "Funil" },
+              { id: "hoje", rotulo: `Follow-ups${pendentes.length ? ` (${pendentes.length})` : ""}` },
+              { id: "leads", rotulo: `Leads (${ativos.length})` },
+              { id: "config", rotulo: "Cadências" },
+            ].map((t) => (
+              <button key={t.id} onClick={() => setAba(t.id)}
+                style={{ border: "none", borderRadius: 20, padding: "8px 15px", fontSize: 13, fontWeight: 600,
+                  background: aba === t.id ? CORES.areia : "rgba(245,243,238,0.12)",
+                  color: aba === t.id ? CORES.floresta : CORES.areia }}>
+                {t.rotulo}
+              </button>
+            ))}
+          </nav>
         </div>
-      );
-    }
+      </header>
 
-    function Linha({ rotulo, valor }) {
-      return (
-        <div style={{ display: "flex", gap: 12 }}>
-          <dt style={{ width: 122, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: CORES.suave, paddingTop: 3 }}>{rotulo}</dt>
-          <dd style={{ margin: 0, flex: 1 }}>{valor}</dd>
+      <main style={{ maxWidth: 760, margin: "0 auto", padding: "20px 16px 80px" }}>
+        {erro && (
+          <div style={{ background: "#F3E2DC", color: CORES.atrasado, padding: "10px 14px", borderRadius: 8, fontSize: 13, marginBottom: 16 }}>
+            {erro}
+            <button onClick={() => setErro(null)} style={{ float: "right", border: "none", background: "none", color: CORES.atrasado, fontWeight: 700 }}>✕</button>
+          </div>
+        )}
+
+        {/* ===== FUNIL ===== */}
+        {aba === "funil" && (
+          <section>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: 10, marginBottom: 6 }}>
+              <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 25, fontWeight: 600, margin: 0 }}>Funil comercial</h2>
+              <div style={{ display: "flex", gap: 4 }}>
+                {[["semana", "Semana"], ["mes", "Mês"], ["tudo", "Tudo"]].map(([id, txt]) => (
+                  <button key={id} onClick={() => setPeriodo(id)}
+                    style={{ border: `1.5px solid ${periodo === id ? CORES.verde : "#D8D2C4"}`, background: periodo === id ? CORES.verde : "none",
+                      color: periodo === id ? CORES.branco : CORES.floresta, borderRadius: 20, padding: "5px 13px", fontSize: 12, fontWeight: 600 }}>
+                    {txt}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {periodo === "mes" && (
+              <select value={mesRef} onChange={(e) => setMesRef(e.target.value)}
+                style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #D8D2C4",
+                  fontSize: 14, background: CORES.branco, marginBottom: 10, color: CORES.floresta }}>
+                {mesesDisponiveis.map((m) => <option key={m} value={m}>{nomeDoMes(m)}</option>)}
+              </select>
+            )}
+            <p style={{ fontSize: 12.5, color: CORES.suave, margin: "0 0 18px" }}>
+              Cada etapa conta os leads que passaram por ela {rotuloPeriodo}, mesmo os que já avançaram depois.
+            </p>
+
+            <GraficoFunil funil={funil} mostrarPercentual={periodo === "tudo"} />
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 14 }}>
+              <Indicador rotulo="Vendas por consulta" valor={funil.porConsulta} nota="Cliente nova" />
+              <Indicador rotulo="Vendas por recompra" valor={funil.porRecompra} nota="Ex-cliente" />
+            </div>
+
+            <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 21, fontWeight: 600, margin: "26px 0 10px" }}>
+              Onde estão os leads agora
+            </h3>
+            <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "6px 16px" }}>
+              {ETAPAS.filter((e) => !e.arquivo).map((e) => {
+                const qtd = ativos.filter((l) => l.etapa === e.id).length;
+                return (
+                  <button key={e.id} onClick={() => { setFiltroEtapa(e.id); setAba("leads"); }}
+                    style={{ display: "flex", justifyContent: "space-between", width: "100%", border: "none", background: "none",
+                      padding: "10px 0", borderBottom: `1px solid ${CORES.areia}`, fontSize: 14, color: CORES.floresta, textAlign: "left" }}>
+                    <span>{e.nome}</span>
+                    <strong style={{ color: qtd ? CORES.verde : CORES.suave }}>{qtd}</strong>
+                  </button>
+                );
+              })}
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0", fontSize: 14, color: CORES.suave }}>
+                <span>Ex-clientes na base</span>
+                <strong>{leads.filter((l) => l.exCliente).length}</strong>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ===== FOLLOW-UPS ===== */}
+        {aba === "hoje" && (
+          <section>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 25, fontWeight: 600, margin: "6px 0 4px" }}>
+              Quem precisa de você hoje
+            </h2>
+            <p style={{ fontSize: 13, color: CORES.suave, margin: "0 0 18px" }}>
+              Ao registrar o contato, o lead esfria um degrau — dentro do limite que a etapa permite.
+            </p>
+            {pendentes.length === 0 ? (
+              <Vazio titulo="Tudo em dia" texto="Nenhum lead aguardando contato agora." />
+            ) : (
+              pendentes.map((l) => (
+                <CartaoLead key={l.id} lead={l} aoAbrir={() => setAberto(l)} aoContatar={() => registrarContato(l.id)} />
+              ))
+            )}
+          </section>
+        )}
+
+        {/* ===== LEADS ===== */}
+        {aba === "leads" && (
+          <section>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0 16px" }}>
+              <input placeholder="Buscar por nome…" value={busca} onChange={(e) => setBusca(e.target.value)}
+                style={{ flex: "1 1 150px", padding: "10px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, background: CORES.branco }} />
+              <select value={filtroEtapa} onChange={(e) => setFiltroEtapa(e.target.value)}
+                style={{ padding: "10px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, background: CORES.branco }}>
+                <option value="todas">Todas as etapas</option>
+                {ETAPAS.filter((e) => !e.arquivo).map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              </select>
+              <button onClick={() => setEditando("novo")}
+                style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: CORES.verde, color: CORES.branco, fontWeight: 600, fontSize: 14 }}>
+                + Novo lead
+              </button>
+              <button onClick={() => setImportando(true)}
+                style={{ padding: "10px 18px", borderRadius: 8, border: `1.5px solid ${CORES.ouro}`, background: "none", color: CORES.ouro, fontWeight: 600, fontSize: 14 }}>
+                Importar planilha
+              </button>
+            </div>
+            {filtrados.length === 0 ? (
+              <Vazio titulo="Nenhum lead aqui" texto="Cadastre um novo lead ou importe sua planilha." />
+            ) : (
+              filtrados.map((l) => (
+                <CartaoLead key={l.id} lead={l} aoAbrir={() => setAberto(l)} aoContatar={() => registrarContato(l.id)} />
+              ))
+            )}
+          </section>
+        )}
+
+        {/* ===== ARQUIVO ===== */}
+        {aba === "arquivo" && (
+          <section>
+            <button onClick={() => setAba("funil")}
+              style={{ border: "none", background: "none", color: CORES.verde, fontSize: 13, fontWeight: 600, padding: 0, marginBottom: 10 }}>
+              ← Voltar
+            </button>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 25, fontWeight: 600, margin: "6px 0 4px" }}>Arquivo</h2>
+            <p style={{ fontSize: 13, color: CORES.suave, margin: "0 0 18px" }}>
+              Vendas e reprovados saem do dia a dia, mas continuam salvos e contando nos indicadores.
+            </p>
+            {arquivados.length === 0 ? (
+              <Vazio titulo="Arquivo vazio" texto="Nada marcado como venda ou reprovado ainda." />
+            ) : (
+              arquivados
+                .slice()
+                .sort((a, b) => String(b.dtVenda || b.dtReprovado || "").localeCompare(String(a.dtVenda || a.dtReprovado || "")))
+                .map((l) => <CartaoLead key={l.id} lead={l} aoAbrir={() => setAberto(l)} semContato />)
+            )}
+          </section>
+        )}
+
+        {/* ===== CADÊNCIAS ===== */}
+        {aba === "config" && (
+          <section>
+            <h2 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 25, fontWeight: 600, margin: "6px 0 4px" }}>Cadências</h2>
+            <p style={{ fontSize: 13, color: CORES.suave, margin: "0 0 18px" }}>
+              De quantos em quantos dias você entra em contato em cada temperatura.
+            </p>
+            {CADENCIAS.map((c) => (
+              <div key={c.id} style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "12px 16px", marginBottom: 10, display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={{ flex: 1, fontWeight: 600, fontSize: 15 }}>{c.nome}</span>
+                <span style={{ fontSize: 13, color: CORES.suave }}>a cada</span>
+                <input type="number" min="1" value={dias[c.id]}
+                  onChange={(e) => salvar(null, { ...dias, [c.id]: Math.max(1, Number(e.target.value) || 1) })}
+                  style={{ width: 70, padding: "8px 10px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, textAlign: "center" }} />
+                <span style={{ fontSize: 13, color: CORES.suave }}>dias</span>
+              </div>
+            ))}
+
+            <div style={{ background: "#EDEAE0", borderRadius: 12, padding: "14px 16px", marginTop: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: CORES.ouro, marginBottom: 10 }}>
+                Até onde cada etapa pode esfriar
+              </div>
+              {ETAPAS.map((e) => (
+                <div key={e.id} style={{ fontSize: 13, padding: "5px 0", display: "flex", justifyContent: "space-between", gap: 12 }}>
+                  <span style={{ fontWeight: 600 }}>{e.nome}</span>
+                  <span style={{ color: CORES.verde, textAlign: "right" }}>
+                    {e.encerra ? "Arquiva sem venda" : e.arquivo ? "Arquiva como venda" : e.cadencias.length === 0 ? "Sem cadência" : e.cadencias.map((c) => cadenciaPor(c).nome).join(" → ")}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {aba !== "arquivo" && (
+          <div style={{ textAlign: "right", marginTop: 34 }}>
+            <button onClick={() => setAba("arquivo")}
+              style={{ border: "none", background: "none", color: "#B4AFA4", fontSize: 12, padding: "4px 0" }}>
+              Arquivo ({arquivados.length}) →
+            </button>
+          </div>
+        )}
+      </main>
+
+      {aberto && !editando && (
+        <Modal aoFechar={() => setAberto(null)}>
+          <DetalheLead
+            lead={comSituacao.find((l) => l.id === aberto.id) || aberto}
+            aoEditar={() => setEditando(aberto)}
+            aoContatar={() => registrarContato(aberto.id)}
+            aoMudarEtapa={(e) => mudarEtapa(aberto.id, e)}
+            aoMudarCadencia={(c) => mudarCadencia(aberto.id, c)}
+            aoAlternarEx={() => alternarExCliente(aberto.id)}
+            aoExcluir={() => excluirLead(aberto.id)}
+          />
+        </Modal>
+      )}
+
+      {importando && (
+        <Modal aoFechar={() => setImportando(false)}>
+          <ImportarPlanilha aoImportar={importarLeads} aoCancelar={() => setImportando(false)} />
+        </Modal>
+      )}
+
+      {editando && (
+        <Modal aoFechar={() => setEditando(null)}>
+          <FormularioLead lead={editando === "novo" ? null : editando} aoSalvar={salvarLead} aoCancelar={() => setEditando(null)} />
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+/* ==== Gráfico de funil ==== */
+function GraficoFunil({ funil, mostrarPercentual }) {
+  const etapas = [
+    { rotulo: "Leads captados", valor: funil.captados },
+    { rotulo: "Conversas", valor: funil.conversas },
+    { rotulo: "Agendamentos", valor: funil.agendamentos },
+    { rotulo: "Comparecimentos", valor: funil.comparecimentos },
+    { rotulo: "Vendas", valor: funil.vendas },
+  ];
+  const maximo = Math.max(...etapas.map((e) => e.valor), 1);
+  const tons = ["#1E3A3A", "#2E5654", "#3B6E6A", "#6E8C6A", "#8C7550"];
+
+  return (
+    <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "18px 16px" }}>
+      {etapas.map((e, i) => {
+        const largura = Math.max((e.valor / maximo) * 100, e.valor > 0 ? 16 : 8);
+        const anterior = i > 0 ? etapas[i - 1].valor : null;
+        const conv = anterior ? Math.round((e.valor / anterior) * 100) : null;
+        return (
+          <div key={e.rotulo} style={{ marginBottom: i === etapas.length - 1 ? 0 : 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 4 }}>
+              <span style={{ fontWeight: 600 }}>{e.rotulo}</span>
+              {mostrarPercentual && conv !== null && anterior > 0 && (
+                <span style={{ color: CORES.suave }}>{conv}% da etapa anterior</span>
+              )}
+            </div>
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ width: `${largura}%`, background: tons[i], color: CORES.branco, borderRadius: 6,
+                padding: "9px 12px", textAlign: "center", fontWeight: 700, fontSize: 16, minWidth: 54, transition: "width 0.3s" }}>
+                {e.valor}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function Indicador({ rotulo, valor, nota }) {
+  return (
+    <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "14px 16px" }}>
+      <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: CORES.suave }}>{rotulo}</div>
+      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 600, color: CORES.floresta, lineHeight: 1.1, marginTop: 2 }}>{valor}</div>
+      <div style={{ fontSize: 12, color: CORES.verde }}>{nota}</div>
+    </div>
+  );
+}
+
+function Vazio({ titulo, texto }) {
+  return (
+    <div style={{ background: CORES.branco, borderRadius: 12, padding: "36px 20px", textAlign: "center", border: `1px solid ${CORES.borda}` }}>
+      <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 22, color: CORES.verde }}>{titulo}</div>
+      <div style={{ fontSize: 13, color: CORES.suave, marginTop: 6 }}>{texto}</div>
+    </div>
+  );
+}
+
+/* ==== Cartão ==== */
+function Etiqueta({ texto, cor, fundo }) {
+  return (
+    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase",
+      color: cor, background: fundo, padding: "3px 8px", borderRadius: 10, whiteSpace: "nowrap" }}>
+      {texto}
+    </span>
+  );
+}
+
+function CartaoLead({ lead, aoAbrir, aoContatar, semContato }) {
+  const etapa = etapaPor(lead.etapa);
+  const cad = cadenciaPor(lead.cadencia);
+  const s = lead.sit;
+  const corSit = s.tipo === "atrasado" ? CORES.atrasado : s.tipo === "hoje" ? CORES.ouro : CORES.verde;
+
+  return (
+    <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "13px 15px", marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+      <button onClick={aoAbrir} style={{ flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 15, color: CORES.floresta }}>{lead.nome}</div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 5, alignItems: "center" }}>
+          <Etiqueta texto={etapa.nome} cor={CORES.floresta} fundo="#E3EAE8" />
+          {lead.exCliente && <Etiqueta texto="Ex-cliente" cor={CORES.ouro} fundo="#F2ECDE" />}
+          {cad && <Etiqueta texto={cad.nome} cor={CORES.verde} fundo="#EAF0EE" />}
+          {!semContato && <span style={{ fontSize: 12, fontWeight: 600, color: corSit }}>{s.texto}</span>}
         </div>
-      );
-    }
+      </button>
+      {!semContato && lead.cadencia && (
+        <button onClick={aoContatar} title="Registrar contato feito hoje"
+          style={{ border: `1.5px solid ${CORES.verde}`, background: "none", color: CORES.verde, borderRadius: 8, padding: "8px 11px", fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+          Contatei ✓
+        </button>
+      )}
+    </div>
+  );
+}
 
-    /* ==== Formulário ==== */
-    function FormularioLead({ lead, aoSalvar, aoCancelar }) {
-      const [d, setD] = useState({
-        id: lead?.id,
-        nome: lead?.nome || "",
-        whatsapp: lead?.whatsapp || "",
-        interesse: lead?.interesse || "",
-        observacoes: lead?.observacoes || "",
-        etapa: lead?.etapa || "nao_responde",
-        cadencia: lead?.cadencia || "quente",
-        exCliente: !!lead?.exCliente,
-        ultimoContato: lead?.ultimoContato || hojeISO(),
-        criadoEm: lead?.criadoEm || hojeISO(),
-        dtConversa: lead?.dtConversa || "",
-        dtAgendamento: lead?.dtAgendamento || "",
-        dtComparecimento: lead?.dtComparecimento || "",
-        dtVenda: lead?.dtVenda || "",
-        dtReprovado: lead?.dtReprovado || "",
+/* ==== Detalhe ==== */
+function DetalheLead({ lead, aoEditar, aoContatar, aoMudarEtapa, aoMudarCadencia, aoAlternarEx, aoExcluir }) {
+  const [confirmando, setConfirmando] = useState(false);
+  const etapa = etapaPor(lead.etapa);
+  const tel = (lead.whatsapp || "").replace(/\D/g, "");
+  const campo = { width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, background: CORES.branco, marginTop: 4 };
+  const rot = { fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: CORES.suave };
+
+  return (
+    <div>
+      <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 26, fontWeight: 600, margin: "0 0 10px" }}>{lead.nome}</h3>
+
+      <label style={{ display: "block", marginBottom: 12 }}>
+        <span style={rot}>Etapa do funil</span>
+        <select value={lead.etapa} onChange={(e) => aoMudarEtapa(e.target.value)} style={campo}>
+          {ETAPAS.map((e) => <option key={e.id} value={e.id}>{e.nome}{e.arquivo ? " (arquiva)" : ""}</option>)}
+        </select>
+      </label>
+
+      {etapa.cadencias.length > 0 && (
+        <label style={{ display: "block", marginBottom: 12 }}>
+          <span style={rot}>Cadência</span>
+          <select value={lead.cadencia || etapa.cadencias[0]} onChange={(e) => aoMudarCadencia(e.target.value)} style={campo}>
+            {etapa.cadencias.map((c) => <option key={c} value={c}>{cadenciaPor(c).nome}</option>)}
+          </select>
+        </label>
+      )}
+
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, marginBottom: 14, cursor: "pointer" }}>
+        <input type="checkbox" checked={!!lead.exCliente} onChange={aoAlternarEx} style={{ width: 17, height: 17 }} />
+        Ex-cliente (a venda dela conta como recompra)
+      </label>
+
+      <dl style={{ margin: "0 0 18px", fontSize: 14, lineHeight: 1.7 }}>
+        <Linha rotulo="WhatsApp" valor={lead.whatsapp || "—"} />
+        <Linha rotulo="Interesse" valor={lead.interesse || "—"} />
+        <Linha rotulo="Último contato" valor={formatarData(lead.ultimoContato)} />
+        <Linha rotulo="Situação" valor={lead.sit?.texto || "—"} />
+        <Linha rotulo="Captada em" valor={formatarData(lead.criadoEm)} />
+        {lead.dtConversa && <Linha rotulo="1ª conversa" valor={formatarData(lead.dtConversa)} />}
+        {lead.dtAgendamento && <Linha rotulo="Agendamento" valor={formatarData(lead.dtAgendamento)} />}
+        {lead.dtComparecimento && <Linha rotulo="Comparecimento" valor={formatarData(lead.dtComparecimento)} />}
+        {lead.dtVenda && <Linha rotulo="Venda" valor={formatarData(lead.dtVenda)} />}
+        {lead.dtReprovado && <Linha rotulo="Encerrado em" valor={formatarData(lead.dtReprovado)} />}
+        {lead.observacoes && (
+          <div style={{ marginTop: 10 }}>
+            <div style={rot}>Observações</div>
+            <div style={{ whiteSpace: "pre-wrap", marginTop: 4 }}>{lead.observacoes}</div>
+          </div>
+        )}
+      </dl>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {tel && (
+          <a href={`https://wa.me/55${tel}`} target="_blank" rel="noreferrer"
+            style={{ background: CORES.verde, color: CORES.branco, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+            Abrir WhatsApp
+          </a>
+        )}
+        {lead.cadencia && (
+          <button onClick={aoContatar} style={{ border: `1.5px solid ${CORES.verde}`, background: "none", color: CORES.verde, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600 }}>
+            Contatei hoje ✓
+          </button>
+        )}
+        <button onClick={aoEditar} style={{ border: "1.5px solid #C9C2B2", background: "none", color: CORES.floresta, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600 }}>
+          Editar
+        </button>
+        {!confirmando ? (
+          <button onClick={() => setConfirmando(true)} style={{ border: "none", background: "none", color: CORES.atrasado, fontSize: 13, fontWeight: 600, marginLeft: "auto" }}>
+            Excluir
+          </button>
+        ) : (
+          <button onClick={aoExcluir} style={{ border: "none", background: CORES.atrasado, color: CORES.branco, borderRadius: 8, padding: "10px 16px", fontSize: 13, fontWeight: 600, marginLeft: "auto" }}>
+            Confirmar exclusão
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function Linha({ rotulo, valor }) {
+  return (
+    <div style={{ display: "flex", gap: 12 }}>
+      <dt style={{ width: 122, fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: CORES.suave, paddingTop: 3 }}>{rotulo}</dt>
+      <dd style={{ margin: 0, flex: 1 }}>{valor}</dd>
+    </div>
+  );
+}
+
+/* ==== Formulário ==== */
+function FormularioLead({ lead, aoSalvar, aoCancelar }) {
+  const [d, setD] = useState({
+    id: lead?.id,
+    nome: lead?.nome || "",
+    whatsapp: lead?.whatsapp || "",
+    interesse: lead?.interesse || "",
+    observacoes: lead?.observacoes || "",
+    etapa: lead?.etapa || "nao_responde",
+    cadencia: lead?.cadencia || "quente",
+    exCliente: !!lead?.exCliente,
+    ultimoContato: lead?.ultimoContato || hojeISO(),
+    criadoEm: lead?.criadoEm || hojeISO(),
+    dtConversa: lead?.dtConversa || "",
+    dtAgendamento: lead?.dtAgendamento || "",
+    dtComparecimento: lead?.dtComparecimento || "",
+    dtVenda: lead?.dtVenda || "",
+    dtReprovado: lead?.dtReprovado || "",
+  });
+
+  const etapa = etapaPor(d.etapa);
+  const dataInvalida = !!d.ultimoContato && !!d.criadoEm && d.ultimoContato < d.criadoEm;
+  const podeSalvar = d.nome.trim().length > 0 && !dataInvalida;
+  const campo = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, background: CORES.branco, marginTop: 4 };
+  const rot = { fontSize: 12, fontWeight: 600, color: CORES.floresta, display: "block", marginTop: 13 };
+
+  /* a captação sempre vem antes do contato: ao mudar uma data, ajusta a outra */
+  function mudarCaptacao(valor) {
+    setD((atual) => ({
+      ...atual,
+      criadoEm: valor,
+      ultimoContato: atual.ultimoContato && valor && atual.ultimoContato < valor ? valor : atual.ultimoContato,
+    }));
+  }
+
+  return (
+    <div>
+      <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, margin: 0 }}>
+        {lead ? "Editar lead" : "Novo lead"}
+      </h3>
+
+      <label style={rot}>Nome *
+        <input style={campo} value={d.nome} onChange={(e) => setD({ ...d, nome: e.target.value })} placeholder="Nome da cliente" />
+      </label>
+      <label style={rot}>WhatsApp
+        <input style={campo} value={d.whatsapp} onChange={(e) => setD({ ...d, whatsapp: e.target.value })} placeholder="(65) 99999-9999" />
+      </label>
+      <label style={rot}>Interesse
+        <input style={campo} value={d.interesse} onChange={(e) => setD({ ...d, interesse: e.target.value })} placeholder="Ex.: Ultraformer, limpeza de pele…" />
+      </label>
+      <label style={rot}>Etapa do funil
+        <select style={campo} value={d.etapa}
+          onChange={(e) => setD({ ...d, etapa: e.target.value, cadencia: cadenciaValida(e.target.value, d.cadencia) })}>
+          {ETAPAS.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+        </select>
+      </label>
+      {etapa.cadencias.length > 0 ? (
+        <label style={rot}>Cadência
+          <select style={campo} value={d.cadencia} onChange={(e) => setD({ ...d, cadencia: e.target.value })}>
+            {etapa.cadencias.map((c) => <option key={c} value={c}>{cadenciaPor(c).nome}</option>)}
+          </select>
+        </label>
+      ) : (
+        <div style={{ fontSize: 12.5, color: CORES.verde, marginTop: 13 }}>Esta etapa não tem cadência de follow-up.</div>
+      )}
+      <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, marginTop: 14, cursor: "pointer" }}>
+        <input type="checkbox" checked={d.exCliente} onChange={(e) => setD({ ...d, exCliente: e.target.checked })} style={{ width: 17, height: 17 }} />
+        Ex-cliente
+      </label>
+      <label style={rot}>Data de captação
+        <input type="date" style={campo} value={d.criadoEm} onChange={(e) => mudarCaptacao(e.target.value)} />
+      </label>
+      <label style={rot}>Data do último contato
+        <input type="date" style={{ ...campo, borderColor: dataInvalida ? CORES.atrasado : "#D8D2C4" }}
+          value={d.ultimoContato} min={d.criadoEm || undefined}
+          onChange={(e) => setD({ ...d, ultimoContato: e.target.value })} />
+      </label>
+      {dataInvalida && (
+        <div style={{ color: CORES.atrasado, fontSize: 12.5, marginTop: 6 }}>
+          O último contato não pode ser anterior à captação ({formatarData(d.criadoEm)}).
+        </div>
+      )}
+      <label style={rot}>Observações
+        <textarea style={{ ...campo, minHeight: 76, resize: "vertical" }} value={d.observacoes}
+          onChange={(e) => setD({ ...d, observacoes: e.target.value })}
+          placeholder="Como conheceu a clínica, preferências, histórico da conversa…" />
+      </label>
+
+      <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+        <button disabled={!podeSalvar} onClick={() => aoSalvar(d)}
+          style={{ background: podeSalvar ? CORES.verde : "#B9C7C3", color: CORES.branco, border: "none", borderRadius: 8, padding: "11px 20px", fontSize: 14, fontWeight: 600, cursor: podeSalvar ? "pointer" : "not-allowed" }}>
+          Salvar lead
+        </button>
+        <button onClick={aoCancelar} style={{ background: "none", border: "1.5px solid #C9C2B2", color: CORES.floresta, borderRadius: 8, padding: "11px 20px", fontSize: 14, fontWeight: 600 }}>
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ==== Importação ==== */
+function normalizarData(valor) {
+  if (!valor && valor !== 0) return "";
+  if (valor instanceof Date && !isNaN(valor)) {
+    return `${valor.getFullYear()}-${String(valor.getMonth() + 1).padStart(2, "0")}-${String(valor.getDate()).padStart(2, "0")}`;
+  }
+  const s = String(valor).trim();
+  let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if (m) {
+    const ano = m[3].length === 2 ? `20${m[3]}` : m[3];
+    return `${ano}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  }
+  return "";
+}
+
+function acharEtapa(texto) {
+  const t = String(texto || "").trim().toLowerCase();
+  if (!t) return null;
+  const achada = ETAPAS.find((e) => e.nome.toLowerCase() === t || e.id === t);
+  if (achada) return achada.id;
+  if (t.includes("não resp") || t.includes("nao resp")) return "nao_responde";
+  if (t.includes("nurtur") || t.includes("nutri")) return "nurturing";
+  if (t.includes("convers")) return "conversando";
+  if (t.includes("agendand")) return "agendando";
+  if (t.includes("agendad")) return "agendado";
+  if (t.includes("orçam") || t.includes("orcam")) return "com_orcamento";
+  if (t.includes("falt")) return "falta";
+  if (t.includes("reprov")) return "venda_reprovada";
+  if (t.includes("recus") || t.includes("perdid") || t.includes("descart")) return "recusado";
+  if (t.includes("vend")) return "venda";
+  return null;
+}
+
+function ImportarPlanilha({ aoImportar, aoCancelar }) {
+  const [linhas, setLinhas] = useState(null);
+  const [colunas, setColunas] = useState([]);
+  const [mapa, setMapa] = useState({ nome: "", whatsapp: "", interesse: "", observacoes: "", etapa: "", exCliente: "", ultimoContato: "" });
+  const [etapaPadrao, setEtapaPadrao] = useState("nao_responde");
+  const [erroArq, setErroArq] = useState(null);
+
+  async function lerArquivo(e) {
+    const arquivo = e.target.files?.[0];
+    if (!arquivo) return;
+    setErroArq(null);
+    try {
+      const buf = await arquivo.arrayBuffer();
+      const wb = XLSX.read(buf, { cellDates: true });
+      const dados = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+      if (!dados.length) { setErroArq("A planilha está vazia ou sem cabeçalhos na primeira linha."); return; }
+      const cab = Object.keys(dados[0]);
+      const achar = (...t) => cab.find((h) => t.some((x) => h.toLowerCase().includes(x))) || "";
+      setColunas(cab);
+      setLinhas(dados);
+      setMapa({
+        nome: achar("nome", "cliente", "lead"),
+        whatsapp: achar("whats", "telefone", "celular", "fone"),
+        interesse: achar("interesse", "tratamento", "procedimento"),
+        observacoes: achar("obs", "nota", "coment"),
+        etapa: achar("etapa", "situa", "status", "categoria"),
+        exCliente: achar("ex-cliente", "ex cliente", "recompra"),
+        ultimoContato: achar("contato", "data"),
       });
+    } catch {
+      setErroArq("Não consegui ler este arquivo. Use .xlsx, .xls ou .csv.");
+    }
+  }
 
-      const etapa = etapaPor(d.etapa);
-      const dataInvalida = !!d.ultimoContato && !!d.criadoEm && d.ultimoContato < d.criadoEm;
-      const podeSalvar = d.nome.trim().length > 0 && !dataInvalida;
-      const campo = { display: "block", width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 14, background: CORES.branco, marginTop: 4 };
-      const rot = { fontSize: 12, fontWeight: 600, color: CORES.floresta, display: "block", marginTop: 13 };
+  const validos = useMemo(() => {
+    if (!linhas || !mapa.nome) return [];
+    return linhas.map((r) => {
+      const nome = String(r[mapa.nome] ?? "").trim();
+      if (!nome) return null;
+      const etapaId = (mapa.etapa && acharEtapa(r[mapa.etapa])) || etapaPadrao;
+      const ex = mapa.exCliente
+        ? ["sim", "s", "x", "true", "1", "ex-cliente", "ex cliente"].includes(String(r[mapa.exCliente] ?? "").trim().toLowerCase())
+        : false;
+      const contato = (mapa.ultimoContato && normalizarData(r[mapa.ultimoContato])) || hojeISO();
+      /* se o contato da planilha é mais antigo que hoje, ele também marca a captação */
+      const captacao = contato < hojeISO() ? contato : hojeISO();
+      return {
+        nome,
+        whatsapp: mapa.whatsapp ? String(r[mapa.whatsapp] ?? "").trim() : "",
+        interesse: mapa.interesse ? String(r[mapa.interesse] ?? "").trim() : "",
+        observacoes: mapa.observacoes ? String(r[mapa.observacoes] ?? "").trim() : "",
+        etapa: etapaId,
+        cadencia: cadenciaValida(etapaId, "quente"),
+        exCliente: ex,
+        ultimoContato: contato,
+        criadoEm: captacao,
+      };
+    }).filter(Boolean);
+  }, [linhas, mapa, etapaPadrao]);
 
-      /* a captação sempre vem antes do contato: ao mudar uma data, ajusta a outra */
-      function mudarCaptacao(valor) {
-        setD((atual) => ({
-          ...atual,
-          criadoEm: valor,
-          ultimoContato: atual.ultimoContato && valor && atual.ultimoContato < valor ? valor : atual.ultimoContato,
-        }));
-      }
+  const campo = { display: "block", width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 13, background: CORES.branco, marginTop: 4 };
+  const rot = { fontSize: 12, fontWeight: 600, color: CORES.floresta, display: "block", marginTop: 12 };
 
-      return (
-        <div>
-          <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, margin: 0 }}>
-            {lead ? "Editar lead" : "Novo lead"}
-          </h3>
+  return (
+    <div>
+      <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, margin: 0 }}>Importar planilha</h3>
+      <p style={{ fontSize: 13, color: CORES.verde, margin: "6px 0 14px" }}>
+        A primeira linha deve ter os títulos das colunas (Nome, WhatsApp, Etapa…).
+      </p>
+      <input type="file" accept=".xlsx,.xls,.csv" onChange={lerArquivo} style={{ fontSize: 13 }} />
+      {erroArq && <div style={{ color: CORES.atrasado, fontSize: 13, marginTop: 8 }}>{erroArq}</div>}
 
-          <label style={rot}>Nome *
-            <input style={campo} value={d.nome} onChange={(e) => setD({ ...d, nome: e.target.value })} placeholder="Nome da cliente" />
-          </label>
-          <label style={rot}>WhatsApp
-            <input style={campo} value={d.whatsapp} onChange={(e) => setD({ ...d, whatsapp: e.target.value })} placeholder="(65) 99999-9999" />
-          </label>
-          <label style={rot}>Interesse
-            <input style={campo} value={d.interesse} onChange={(e) => setD({ ...d, interesse: e.target.value })} placeholder="Ex.: Ultraformer, limpeza de pele…" />
-          </label>
-          <label style={rot}>Etapa do funil
-            <select style={campo} value={d.etapa}
-              onChange={(e) => setD({ ...d, etapa: e.target.value, cadencia: cadenciaValida(e.target.value, d.cadencia) })}>
-              {ETAPAS.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
-            </select>
-          </label>
-          {etapa.cadencias.length > 0 ? (
-            <label style={rot}>Cadência
-              <select style={campo} value={d.cadencia} onChange={(e) => setD({ ...d, cadencia: e.target.value })}>
-                {etapa.cadencias.map((c) => <option key={c} value={c}>{cadenciaPor(c).nome}</option>)}
+      {linhas && (
+        <>
+          <div style={{ background: "#EDEAE0", borderRadius: 10, padding: "12px 14px", marginTop: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: CORES.ouro }}>
+              Combine as colunas da sua planilha
+            </div>
+            {[["nome", "Nome *"], ["whatsapp", "WhatsApp"], ["interesse", "Interesse"], ["observacoes", "Observações"], ["etapa", "Etapa"], ["exCliente", "Ex-cliente"], ["ultimoContato", "Último contato"]].map(([k, txt]) => (
+              <label key={k} style={rot}>{txt}
+                <select style={campo} value={mapa[k]} onChange={(e) => setMapa({ ...mapa, [k]: e.target.value })}>
+                  <option value="">— não importar —</option>
+                  {colunas.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </label>
+            ))}
+            <label style={rot}>Etapa padrão (quando a linha não tiver etapa reconhecida)
+              <select style={campo} value={etapaPadrao} onChange={(e) => setEtapaPadrao(e.target.value)}>
+                {ETAPAS.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
               </select>
             </label>
-          ) : (
-            <div style={{ fontSize: 12.5, color: CORES.verde, marginTop: 13 }}>Esta etapa não tem cadência de follow-up.</div>
-          )}
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, marginTop: 14, cursor: "pointer" }}>
-            <input type="checkbox" checked={d.exCliente} onChange={(e) => setD({ ...d, exCliente: e.target.checked })} style={{ width: 17, height: 17 }} />
-            Ex-cliente
-          </label>
-          <label style={rot}>Data de captação
-            <input type="date" style={campo} value={d.criadoEm} onChange={(e) => mudarCaptacao(e.target.value)} />
-          </label>
-          <label style={rot}>Data do último contato
-            <input type="date" style={{ ...campo, borderColor: dataInvalida ? CORES.atrasado : "#D8D2C4" }}
-              value={d.ultimoContato} min={d.criadoEm || undefined}
-              onChange={(e) => setD({ ...d, ultimoContato: e.target.value })} />
-          </label>
-          {dataInvalida && (
-            <div style={{ color: CORES.atrasado, fontSize: 12.5, marginTop: 6 }}>
-              O último contato não pode ser anterior à captação ({formatarData(d.criadoEm)}).
-            </div>
-          )}
-          <label style={rot}>Observações
-            <textarea style={{ ...campo, minHeight: 76, resize: "vertical" }} value={d.observacoes}
-              onChange={(e) => setD({ ...d, observacoes: e.target.value })}
-              placeholder="Como conheceu a clínica, preferências, histórico da conversa…" />
-          </label>
+          </div>
 
-          <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
-            <button disabled={!podeSalvar} onClick={() => aoSalvar(d)}
-              style={{ background: podeSalvar ? CORES.verde : "#B9C7C3", color: CORES.branco, border: "none", borderRadius: 8, padding: "11px 20px", fontSize: 14, fontWeight: 600, cursor: podeSalvar ? "pointer" : "not-allowed" }}>
-              Salvar lead
+          <div style={{ fontSize: 13, marginTop: 14 }}>
+            {mapa.nome
+              ? <>Prontos para importar: <strong>{validos.length}</strong> lead{validos.length !== 1 ? "s" : ""}. Linhas sem nome são ignoradas.</>
+              : "Escolha qual coluna contém o nome do lead."}
+          </div>
+
+          <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+            <button disabled={!validos.length} onClick={() => aoImportar(validos)}
+              style={{ background: validos.length ? CORES.verde : "#B9C7C3", color: CORES.branco, border: "none", borderRadius: 8, padding: "11px 20px", fontSize: 14, fontWeight: 600, cursor: validos.length ? "pointer" : "not-allowed" }}>
+              Importar {validos.length || ""} lead{validos.length !== 1 ? "s" : ""}
             </button>
             <button onClick={aoCancelar} style={{ background: "none", border: "1.5px solid #C9C2B2", color: CORES.floresta, borderRadius: 8, padding: "11px 20px", fontSize: 14, fontWeight: 600 }}>
               Cancelar
             </button>
           </div>
-        </div>
-      );
-    }
+        </>
+      )}
+    </div>
+  );
+}
 
-    /* ==== Importação ==== */
-    function normalizarData(valor) {
-      if (!valor && valor !== 0) return "";
-      if (valor instanceof Date && !isNaN(valor)) {
-        return `${valor.getFullYear()}-${String(valor.getMonth() + 1).padStart(2, "0")}-${String(valor.getDate()).padStart(2, "0")}`;
+/* ==== Modal ==== */
+function Modal({ children, aoFechar }) {
+  return (
+    <div onClick={aoFechar}
+      style={{ position: "fixed", inset: 0, background: "rgba(30,58,58,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50, padding: 12 }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ background: CORES.areia, borderRadius: 16, padding: "22px 20px 26px", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(30,58,58,0.3)" }}>
+        <button onClick={aoFechar} aria-label="Fechar" style={{ float: "right", border: "none", background: "none", fontSize: 18, color: CORES.verde, marginTop: -6 }}>✕</button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/* ==== Tela de entrada com senha ==== */
+function Portao() {
+  const [senha, setSenha] = useState("");
+  const [estado, setEstado] = useState("form"); // form | verificando | ok
+  const [erro, setErro] = useState("");
+
+  async function entrar() {
+    if (!senha.trim()) return;
+    setEstado("verificando");
+    setErro("");
+    SESSAO.senha = senha;
+    try {
+      const r = await chamarAPI({ acao: "ler", senha: senha });
+      if (r.ok) {
+        SESSAO.rev = r.rev;
+        setEstado("ok");
+      } else if (r.erro === "senha") {
+        setErro("Senha incorreta.");
+        setEstado("form");
+      } else {
+        setErro("Não foi possível conectar à planilha. Verifique a publicação do Apps Script.");
+        setEstado("form");
       }
-      const s = String(valor).trim();
-      let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (m) return `${m[1]}-${m[2]}-${m[3]}`;
-      m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
-      if (m) {
-        const ano = m[3].length === 2 ? `20${m[3]}` : m[3];
-        return `${ano}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-      }
-      return "";
+    } catch (e) {
+      setErro("Sem conexão com a planilha. Confira a URL do Apps Script e sua internet.");
+      setEstado("form");
     }
+  }
 
-    function acharEtapa(texto) {
-      const t = String(texto || "").trim().toLowerCase();
-      if (!t) return null;
-      const achada = ETAPAS.find((e) => e.nome.toLowerCase() === t || e.id === t);
-      if (achada) return achada.id;
-      if (t.includes("não resp") || t.includes("nao resp")) return "nao_responde";
-      if (t.includes("convers")) return "conversando";
-      if (t.includes("agendand")) return "agendando";
-      if (t.includes("agendad")) return "agendado";
-      if (t.includes("orçam") || t.includes("orcam")) return "com_orcamento";
-      if (t.includes("falt")) return "falta";
-      if (t.includes("vend")) return "venda";
-      if (t.includes("reprov") || t.includes("recus")) return "reprovado";
-      return null;
-    }
+  if (estado === "ok") return <CRMFloreSer />;
 
-    function ImportarPlanilha({ aoImportar, aoCancelar }) {
-      const [linhas, setLinhas] = useState(null);
-      const [colunas, setColunas] = useState([]);
-      const [mapa, setMapa] = useState({ nome: "", whatsapp: "", interesse: "", observacoes: "", etapa: "", exCliente: "", ultimoContato: "" });
-      const [etapaPadrao, setEtapaPadrao] = useState("nao_responde");
-      const [erroArq, setErroArq] = useState(null);
-
-      async function lerArquivo(e) {
-        const arquivo = e.target.files?.[0];
-        if (!arquivo) return;
-        setErroArq(null);
-        try {
-          const buf = await arquivo.arrayBuffer();
-          const wb = XLSX.read(buf, { cellDates: true });
-          const dados = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
-          if (!dados.length) { setErroArq("A planilha está vazia ou sem cabeçalhos na primeira linha."); return; }
-          const cab = Object.keys(dados[0]);
-          const achar = (...t) => cab.find((h) => t.some((x) => h.toLowerCase().includes(x))) || "";
-          setColunas(cab);
-          setLinhas(dados);
-          setMapa({
-            nome: achar("nome", "cliente", "lead"),
-            whatsapp: achar("whats", "telefone", "celular", "fone"),
-            interesse: achar("interesse", "tratamento", "procedimento"),
-            observacoes: achar("obs", "nota", "coment"),
-            etapa: achar("etapa", "situa", "status", "categoria"),
-            exCliente: achar("ex-cliente", "ex cliente", "recompra"),
-            ultimoContato: achar("contato", "data"),
-          });
-        } catch {
-          setErroArq("Não consegui ler este arquivo. Use .xlsx, .xls ou .csv.");
-        }
-      }
-
-      const validos = useMemo(() => {
-        if (!linhas || !mapa.nome) return [];
-        return linhas.map((r) => {
-          const nome = String(r[mapa.nome] ?? "").trim();
-          if (!nome) return null;
-          const etapaId = (mapa.etapa && acharEtapa(r[mapa.etapa])) || etapaPadrao;
-          const ex = mapa.exCliente
-            ? ["sim", "s", "x", "true", "1", "ex-cliente", "ex cliente"].includes(String(r[mapa.exCliente] ?? "").trim().toLowerCase())
-            : false;
-          const contato = (mapa.ultimoContato && normalizarData(r[mapa.ultimoContato])) || hojeISO();
-          /* se o contato da planilha é mais antigo que hoje, ele também marca a captação */
-          const captacao = contato < hojeISO() ? contato : hojeISO();
-          return {
-            nome,
-            whatsapp: mapa.whatsapp ? String(r[mapa.whatsapp] ?? "").trim() : "",
-            interesse: mapa.interesse ? String(r[mapa.interesse] ?? "").trim() : "",
-            observacoes: mapa.observacoes ? String(r[mapa.observacoes] ?? "").trim() : "",
-            etapa: etapaId,
-            cadencia: cadenciaValida(etapaId, "quente"),
-            exCliente: ex,
-            ultimoContato: contato,
-            criadoEm: captacao,
-          };
-        }).filter(Boolean);
-      }, [linhas, mapa, etapaPadrao]);
-
-      const campo = { display: "block", width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 13, background: CORES.branco, marginTop: 4 };
-      const rot = { fontSize: 12, fontWeight: 600, color: CORES.floresta, display: "block", marginTop: 12 };
-
-      return (
-        <div>
-          <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 24, fontWeight: 600, margin: 0 }}>Importar planilha</h3>
-          <p style={{ fontSize: 13, color: CORES.verde, margin: "6px 0 14px" }}>
-            A primeira linha deve ter os títulos das colunas (Nome, WhatsApp, Etapa…).
-          </p>
-          <input type="file" accept=".xlsx,.xls,.csv" onChange={lerArquivo} style={{ fontSize: 13 }} />
-          {erroArq && <div style={{ color: CORES.atrasado, fontSize: 13, marginTop: 8 }}>{erroArq}</div>}
-
-          {linhas && (
-            <>
-              <div style={{ background: "#EDEAE0", borderRadius: 10, padding: "12px 14px", marginTop: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: CORES.ouro }}>
-                  Combine as colunas da sua planilha
-                </div>
-                {[["nome", "Nome *"], ["whatsapp", "WhatsApp"], ["interesse", "Interesse"], ["observacoes", "Observações"], ["etapa", "Etapa"], ["exCliente", "Ex-cliente"], ["ultimoContato", "Último contato"]].map(([k, txt]) => (
-                  <label key={k} style={rot}>{txt}
-                    <select style={campo} value={mapa[k]} onChange={(e) => setMapa({ ...mapa, [k]: e.target.value })}>
-                      <option value="">— não importar —</option>
-                      {colunas.map((c) => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </label>
-                ))}
-                <label style={rot}>Etapa padrão (quando a linha não tiver etapa reconhecida)
-                  <select style={campo} value={etapaPadrao} onChange={(e) => setEtapaPadrao(e.target.value)}>
-                    {ETAPAS.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
-                  </select>
-                </label>
-              </div>
-
-              <div style={{ fontSize: 13, marginTop: 14 }}>
-                {mapa.nome
-                  ? <>Prontos para importar: <strong>{validos.length}</strong> lead{validos.length !== 1 ? "s" : ""}. Linhas sem nome são ignoradas.</>
-                  : "Escolha qual coluna contém o nome do lead."}
-              </div>
-
-              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-                <button disabled={!validos.length} onClick={() => aoImportar(validos)}
-                  style={{ background: validos.length ? CORES.verde : "#B9C7C3", color: CORES.branco, border: "none", borderRadius: 8, padding: "11px 20px", fontSize: 14, fontWeight: 600, cursor: validos.length ? "pointer" : "not-allowed" }}>
-                  Importar {validos.length || ""} lead{validos.length !== 1 ? "s" : ""}
-                </button>
-                <button onClick={aoCancelar} style={{ background: "none", border: "1.5px solid #C9C2B2", color: CORES.floresta, borderRadius: 8, padding: "11px 20px", fontSize: 14, fontWeight: 600 }}>
-                  Cancelar
-                </button>
-              </div>
-            </>
-          )}
+  return (
+    <div style={{ minHeight: "100vh", background: "#1E3A3A", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Montserrat', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Montserrat:wght@400;500;600;700&display=swap');`}</style>
+      <div style={{ background: "#F5F3EE", borderRadius: 16, padding: "34px 28px", width: "100%", maxWidth: 380, textAlign: "center" }}>
+        <img src="logo.png" width="366" height="380" alt="Símbolo FloreSer"
+          style={{ display: "block", height: 58, width: "auto", margin: "0 auto 16px" }} />
+        <div style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "#8C7550", marginBottom: 6 }}>
+          Clínica Corpo e Alma
         </div>
-      );
-    }
+        <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 32, margin: "0 0 22px", color: "#1E3A3A" }}>
+          CRM Flore<span style={{ fontStyle: "italic", color: "#8C7550" }}>Ser</span>
+        </h1>
+        <input
+          type="password"
+          value={senha}
+          onChange={(e) => setSenha(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") entrar(); }}
+          placeholder="Senha de acesso"
+          disabled={estado === "verificando"}
+          style={{ width: "100%", padding: "12px 14px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 15, textAlign: "center", fontFamily: "'Montserrat', sans-serif" }}
+        />
+        {erro && <div style={{ color: "#A3543A", fontSize: 13, marginTop: 10 }}>{erro}</div>}
+        <button
+          onClick={entrar}
+          disabled={estado === "verificando" || !senha.trim()}
+          style={{ width: "100%", marginTop: 14, padding: "12px", borderRadius: 8, border: "none", background: "#3B6E6A", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: estado === "verificando" || !senha.trim() ? 0.6 : 1, fontFamily: "'Montserrat', sans-serif" }}
+        >
+          {estado === "verificando" ? "Conectando…" : "Entrar"}
+        </button>
+      </div>
+      <a href="index.html" style={{ marginTop: 18, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#C9BFA8", textDecoration: "none" }}>
+        ‹ Início
+      </a>
+    </div>
+  );
+}
 
-    /* ==== Modal ==== */
-    function Modal({ children, aoFechar }) {
-      return (
-        <div onClick={aoFechar}
-          style={{ position: "fixed", inset: 0, background: "rgba(30,58,58,0.45)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 50, padding: 12 }}>
-          <div onClick={(e) => e.stopPropagation()}
-            style={{ background: CORES.areia, borderRadius: 16, padding: "22px 20px 26px", width: "100%", maxWidth: 480, maxHeight: "88vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(30,58,58,0.3)" }}>
-            <button onClick={aoFechar} aria-label="Fechar" style={{ float: "right", border: "none", background: "none", fontSize: 18, color: CORES.verde, marginTop: -6 }}>✕</button>
-            {children}
-          </div>
-        </div>
-      );
-    }
-
-    /* ==== Tela de entrada com senha ==== */
-    function Portao() {
-      const [senha, setSenha] = useState("");
-      const [estado, setEstado] = useState("form"); // form | verificando | ok
-      const [erro, setErro] = useState("");
-
-      async function entrar() {
-        if (!senha.trim()) return;
-        setEstado("verificando");
-        setErro("");
-        SESSAO.senha = senha;
-        try {
-          const r = await chamarAPI({ acao: "ler", senha: senha });
-          if (r.ok) {
-            SESSAO.rev = r.rev;
-            setEstado("ok");
-          } else if (r.erro === "senha") {
-            setErro("Senha incorreta.");
-            setEstado("form");
-          } else {
-            setErro("Não foi possível conectar à planilha. Verifique a publicação do Apps Script.");
-            setEstado("form");
-          }
-        } catch (e) {
-          setErro("Sem conexão com a planilha. Confira a URL do Apps Script e sua internet.");
-          setEstado("form");
-        }
-      }
-
-      if (estado === "ok") return <CRMFloreSer />;
-
-      return (
-        <div style={{ minHeight: "100vh", background: "#1E3A3A", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Montserrat', sans-serif" }}>
-          <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Montserrat:wght@400;500;600;700&display=swap');`}</style>
-          <div style={{ background: "#F5F3EE", borderRadius: 16, padding: "34px 28px", width: "100%", maxWidth: 380, textAlign: "center" }}>
-            <img src="logo.png" width="366" height="380" alt="Símbolo FloreSer"
-              style={{ display: "block", height: 58, width: "auto", margin: "0 auto 16px" }} />
-            <div style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "#8C7550", marginBottom: 6 }}>
-              Clínica Corpo e Alma
-            </div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 32, margin: "0 0 22px", color: "#1E3A3A" }}>
-              CRM Flore<span style={{ fontStyle: "italic", color: "#8C7550" }}>Ser</span>
-            </h1>
-            <input
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") entrar(); }}
-              placeholder="Senha de acesso"
-              disabled={estado === "verificando"}
-              style={{ width: "100%", padding: "12px 0px", borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 15, textAlign: "center", fontFamily: "'Montserrat', sans-serif" }}
-            />
-            {erro && <div style={{ color: "#A3543A", fontSize: 13, marginTop: 10 }}>{erro}</div>}
-            <button
-              onClick={entrar}
-              disabled={estado === "verificando" || !senha.trim()}
-              style={{ width: "100%", marginTop: 14, padding: "12px", borderRadius: 8, border: "none", background: "#3B6E6A", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: estado === "verificando" || !senha.trim() ? 0.6 : 1, fontFamily: "'Montserrat', sans-serif" }}
-            >
-              {estado === "verificando" ? "Conectando…" : "Entrar"}
-            </button>
-          </div>
-          <a href="index.html" style={{ marginTop: 18, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#C9BFA8", textDecoration: "none" }}>
-            ‹ Início
-          </a>
-        </div>
-      );
-    }
-
-    ReactDOM.createRoot(document.getElementById("root")).render(<Portao />);
-  </script>
+ReactDOM.createRoot(document.getElementById("root")).render(<Portao />);
+</script>
 </body>
-
 </html>

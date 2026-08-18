@@ -22,6 +22,26 @@
   /* Mais recente primeiro. Use apenas categorias com conteúdo real. */
   var CHANGELOG = [
     {
+      versao: "1.1.0",
+      codinome: "SEIVA",
+      data: "18/08/2026",
+      mudancas: {
+        "Adicionado": [
+          "Máquinas temporárias na agenda: você cadastra as datas em que o Soprano e o Harmony vêm, e a lista das pacientes daquela máquina abre sozinha 14 dias antes.",
+          "Opção “próxima vinda” para a paciente que não consegue vir no dia da máquina — ela volta automaticamente na data seguinte que você cadastrar.",
+          "Ciclos separados por área na agenda: Facial, Corporal e Capilar, cada um com o seu prazo e o seu agendamento.",
+          "Três etapas novas no funil do CRM: Nurturing, Recusado e Venda reprovada."
+        ],
+        "Alterado": [
+          "Quem estiver em condição no dia da vinda da máquina sai da lista e entra na fila da próxima, com um aviso dizendo o motivo.",
+          "A etapa “Reprovado” virou “Recusado”; os leads que já estavam marcados assim são convertidos sozinhos."
+        ],
+        "Técnico": [
+          "A planilha ganhou abas para ciclos, máquinas, vindas e respostas. Os dados no formato anterior são convertidos na primeira abertura e as abas antigas ficam guardadas."
+        ]
+      }
+    },
+    {
       versao: "1.0.0",
       codinome: "RAIZ",
       data: "14/08/2026",

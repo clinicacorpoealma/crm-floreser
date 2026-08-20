@@ -22,6 +22,25 @@
   /* Mais recente primeiro. Use apenas categorias com conteúdo real. */
   var CHANGELOG = [
     {
+      versao: "1.2.0",
+      codinome: "POUSIO",
+      data: "20/08/2026",
+      mudancas: {
+        "Adicionado": [
+          "Arquivar paciente: quando o plano acaba, ela sai do Dashboard, do quadro semanal e das listas de máquina, mas ciclos, condições, observações e histórico ficam guardados.",
+          "Sub-aba Arquivadas na tela de Pacientes, com botão de restaurar que devolve tudo de uma vez."
+        ],
+        "Alterado": [
+          "Marcar Facial, Corporal e Capilar deixou de ser obrigatório: quem só faz máquina é cadastrada sem nenhum ciclo e aparece na lista com o selo “Só máquinas”.",
+          "Ao arquivar, os follow-ups pendentes daquela paciente são removidos, para não voltarem atrasados meses depois — o aviso de confirmação diz quantos são.",
+          "O rodapé da agenda passou a contar pacientes ativas e arquivadas separadamente."
+        ],
+        "Técnico": [
+          "A aba Pacientes ganhou as colunas de arquivamento, acrescentadas à planilha que já existe sem mexer nas linhas nem renomear abas."
+        ]
+      }
+    },
+    {
       versao: "1.1.0",
       codinome: "SEIVA",
       data: "18/08/2026",

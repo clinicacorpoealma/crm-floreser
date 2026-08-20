@@ -684,6 +684,8 @@ const I = {
   up:   s=>SVG('<path d="M12 19V8m0 0-4 4m4-4 4 4"/><path d="M5 4h14"/>',s),
   eye:  s=>SVG('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="2.8"/>',s),
   lupa: s=>SVG('<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',s),
+  caixa:s=>SVG('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M4.8 9v9.5A1.5 1.5 0 0 0 6.3 20h11.4a1.5 1.5 0 0 0 1.5-1.5V9"/><path d="M10 13h4"/>',s),
+  volta:s=>SVG('<path d="M4 12a8 8 0 1 0 2.6-5.9"/><path d="M4 3.5V7h3.5"/>',s),
   maq:  s=>SVG('<circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3.4M12 17.8v3.4M4.7 4.7l2.4 2.4M16.9 16.9l2.4 2.4M2.8 12h3.4M17.8 12h3.4M4.7 19.3l2.4-2.4M16.9 7.1l2.4-2.4"/>',s),
   rosto:s=>SVG('<circle cx="12" cy="12" r="8.6"/><path d="M9 10.2v.1M15 10.2v.1M8.8 14.6c.9 1.2 1.9 1.8 3.2 1.8s2.3-.6 3.2-1.8"/>',s),
   corpo:s=>SVG('<circle cx="12" cy="4.6" r="2"/><path d="M12 7v7M12 14l-2.6 6.4M12 14l2.6 6.4M6.6 9.2 12 10.4l5.4-1.2"/>',s),
@@ -800,6 +802,8 @@ function normalizar(p){
   p.maquinas=Array.isArray(p.maquinas)?p.maquinas:[];
   p.historico=Array.isArray(p.historico)?p.historico:[];
   p.criadoEm=p.criadoEm||D.hoje();
+  p.arquivada=!!p.arquivada;
+  p.arquivadaEm=D.ok(p.arquivadaEm)?p.arquivadaEm:null;
   /* migração do formato antigo (um ciclo único) para ciclos por área */
   if(!p.ciclos||typeof p.ciclos!=='object'){
     p.ciclos={facial:null,corporal:null,capilar:null};
@@ -867,11 +871,12 @@ function conflito(){
 function statusRodape(){
   const el=document.getElementById('foot-status');
   if(!el) return;
+  const arq=arquivadas().length;
+  const quem=ativas().length+' pacientes ativas'+(arq?' · '+arq+' arquivadas':'');
   if(sinc==='salvando'){ el.textContent='Salvando na planilha…'; el.style.color=''; }
   else if(sinc==='erro'){ el.textContent='Sem conexão — as alterações vão subir assim que voltar';
     el.style.color='var(--alerta)'; }
-  else { el.textContent='Sincronizado com a planilha · '+state.pacientes.length+' pacientes';
-    el.style.color=''; }
+  else { el.textContent='Sincronizado · '+quem; el.style.color=''; }
 }
 
 /* Evita fechar a aba com alteração ainda nao enviada */
@@ -883,10 +888,14 @@ window.addEventListener('beforeunload',e=>{
    CONSULTAS BÁSICAS
    ========================================================== */
 function pac(id){ return state.pacientes.find(p=>p.id===id)||null; }
+function ativas(){ return state.pacientes.filter(p=>!p.arquivada); }
+function arquivadas(){ return state.pacientes.filter(p=>p.arquivada); }
 function cat(id){ return state.categorias.find(c=>c.id===id)||null; }
 function ciclo(p,k){ return (p&&p.ciclos&&p.ciclos[k])||null; }
 function areasDe(p){ return AREAK.filter(k=>ciclo(p,k)); }
-function fuPendentes(){ return state.followups.filter(f=>!f.feito && pac(f.pacienteId)); }
+function fuPendentes(){
+  return state.followups.filter(f=>{ const p=pac(f.pacienteId); return !f.feito&&p&&!p.arquivada; });
+}
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,
   m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
 
@@ -980,7 +989,7 @@ function proximaVindaApos(mid,data){
     .sort((a,b)=>a.data.localeCompare(b.data))[0]||null;
 }
 function pacientesDaMaquina(mid){
-  return state.pacientes.filter(p=>(p.maquinas||[]).indexOf(mid)>=0)
+  return state.pacientes.filter(p=>!p.arquivada&&(p.maquinas||[]).indexOf(mid)>=0)
     .sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
 }
 function statusMaq(v,p,hoje){
@@ -1051,7 +1060,8 @@ function selArea(k,c,semFreq){
 }
 function selCiclos(p){
   const as=areasDe(p);
-  if(!as.length) return '<span class="badge soft">Sem ciclo</span>';
+  if(!as.length) return '<span class="badge soft">'+((p.maquinas||[]).length
+    ?'Só máquinas':'Sem ciclo')+'</span>';
   return as.map(k=>selArea(k,ciclo(p,k))).join('');
 }
 function selCat(p){
@@ -1219,7 +1229,7 @@ function cardMaqPend(o,v,m,hoje){
    ========================================================== */
 function coletar(hoje){
   const out={pendentes:[],primeiros:[],aguardando:[],agendadas:[],sessoesHoje:[],mapa:{}};
-  state.pacientes.forEach(p=>{
+  ativas().forEach(p=>{
     areasDe(p).forEach(k=>{
       const r=resolver(p,k,hoje);
       out.mapa[p.id+'|'+k]=r;
@@ -1291,15 +1301,16 @@ function renderDash(){
     stat(naSemana,'A agendar na semana','')+
     stat(fuSemana,'Follow-ups na semana','')+
     (mp.grupos.length?stat(mp.total,'Máquinas a confirmar',mp.total?'al':''):'')+
-    stat(state.pacientes.length,'Pacientes ativas','');
+    stat(ativas().length,'Pacientes ativas','');
   document.getElementById('pill-dash').textContent = aAgendar+c.fuHoje.length+mp.total;
-  document.getElementById('pill-pac').textContent = state.pacientes.length;
+  document.getElementById('pill-pac').textContent = ativas().length;
   document.getElementById('pill-maq').textContent = vindasAbertas(hoje).length;
 
   /* ---- HOJE ---- */
   let h='';
-  if(!state.pacientes.length){
-    h = vazio('&#10047;','Nenhuma paciente cadastrada ainda',
+  if(!ativas().length){
+    h = vazio('&#10047;', arquivadas().length?'Nenhuma paciente ativa no momento'
+      :'Nenhuma paciente cadastrada ainda',
       'Comece cadastrando as pacientes que precisam ser agendadas, ou importe sua planilha do Excel.',
       '<button class="btn p" data-act="ir-nova">'+I.plus(13)+' Cadastrar primeira paciente</button> '+
       '<button class="btn g" data-act="ir-imp">'+I.up(13)+' Importar do Excel</button>');
@@ -1341,7 +1352,7 @@ function renderDash(){
   let dias='';
   for(let i=0;i<7;i++){
     const d=D.add(hoje,i); let chips='';
-    state.pacientes.forEach(p=>{
+    ativas().forEach(p=>{
       areasDe(p).forEach(k=>{
         const r=c.mapa[p.id+'|'+k]; if(!r) return;
         const a=area(k);
@@ -1402,18 +1413,22 @@ const ui={pg:'dash',sub:'hoje',pacSub:'todas',editId:null,busca:'',condTmp:[]};
    PACIENTES
    ========================================================== */
 function renderPacSub(){
+  const viv=ativas(), arq=arquivadas();
   let h='<button data-ps="todas" class="'+(ui.pacSub==='todas'?'on':'')+'">'+I.user(13)+
-    ' Todas <span style="opacity:.65">'+state.pacientes.length+'</span></button>';
+    ' Todas <span style="opacity:.65">'+viv.length+'</span></button>';
   state.categorias.forEach(c=>{
-    const n=state.pacientes.filter(p=>p.categoriaId===c.id).length;
+    const n=viv.filter(p=>p.categoriaId===c.id).length;
     h+='<button data-ps="'+c.id+'" class="'+(ui.pacSub===c.id?'on':'')+'">'+
       '<i style="width:8px;height:8px;border-radius:50%;background:'+c.cor+';display:block"></i>'+
       esc(c.nome)+' <span style="opacity:.65">'+n+'</span></button>';
   });
-  const sc=state.pacientes.filter(p=>!cat(p.categoriaId)).length;
+  const sc=viv.filter(p=>!cat(p.categoriaId)).length;
   if(sc&&state.categorias.length)
     h+='<button data-ps="sem" class="'+(ui.pacSub==='sem'?'on':'')+'">Sem categoria '+
       '<span style="opacity:.65">'+sc+'</span></button>';
+  if(arq.length)
+    h+='<button data-ps="arquivadas" class="'+(ui.pacSub==='arquivadas'?'on':'')+'">'+
+      I.caixa(13)+' Arquivadas <span style="opacity:.65">'+arq.length+'</span></button>';
   h+='<span class="sep"></span>';
   h+='<button data-ps="nova" class="'+(ui.pacSub==='nova'?'on':'')+'">'+I.plus(13)+' Nova paciente</button>';
   document.getElementById('pac-sub').innerHTML=h;
@@ -1421,8 +1436,12 @@ function renderPacSub(){
 
 /* resumo textual da situação mais urgente entre os ciclos */
 function situacaoPac(p,hoje){
+  if(p.arquivada) return {html:'<span class="badge soft">Arquivada'+
+    (p.arquivadaEm?' em '+D.brc(p.arquivadaEm):'')+'</span>',prazo:null};
   const rs=areasDe(p).map(k=>({k:k,r:resolver(p,k,hoje)}));
-  if(!rs.length) return {html:'<span class="badge soft">Sem ciclo</span>',prazo:null};
+  if(!rs.length) return {html:(p.maquinas||[]).length
+    ? '<span class="badge soft">'+I.maq(11)+' Só máquinas</span>'
+    : '<span class="badge soft">Sem ciclo</span>',prazo:null};
   const peso=o=>o.r.estado==='pendente'?(o.r.atraso>0?0:1):(o.r.estado==='sessao_hoje'?2:
     (o.r.estado==='agendado'?3:4));
   rs.sort((a,b)=>peso(a)-peso(b)||(b.r.atraso-a.r.atraso)||
@@ -1445,13 +1464,15 @@ function renderPac(){
   const alvo=document.getElementById('pac-view');
   if(ui.pacSub==='nova'){ alvo.innerHTML=formPaciente(ui.editId?pac(ui.editId):null); ligarForm(); return; }
   const hoje=D.hoje();
-  let lista=state.pacientes.slice();
+  const arqv=ui.pacSub==='arquivadas';
+  let lista=arqv?arquivadas():ativas();
   if(ui.pacSub==='sem') lista=lista.filter(p=>!cat(p.categoriaId));
-  else if(ui.pacSub!=='todas') lista=lista.filter(p=>p.categoriaId===ui.pacSub);
+  else if(!arqv&&ui.pacSub!=='todas') lista=lista.filter(p=>p.categoriaId===ui.pacSub);
   if(ui.busca){ const q=ui.busca.toLowerCase();
     lista=lista.filter(p=>p.nome.toLowerCase().indexOf(q)>=0||(p.obs||'').toLowerCase().indexOf(q)>=0); }
   lista.sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
 
+  let topo2='';
   const topo='<div style="display:flex;gap:12px;align-items:center;margin-bottom:20px;flex-wrap:wrap">'+
     '<div style="position:relative;flex:1;min-width:220px;max-width:340px">'+
     '<input type="text" id="pac-busca" placeholder="Buscar por nome ou observação" value="'+
@@ -1461,21 +1482,26 @@ function renderPac(){
     '<span class="hintx">'+lista.length+(lista.length===1?' paciente':' pacientes')+'</span></div>';
 
   if(!lista.length){
-    alvo.innerHTML=topo+vazio('&#10047;', state.pacientes.length?'Nenhuma paciente neste filtro'
-      :'Nenhuma paciente cadastrada',
-      state.pacientes.length?'Tente outra categoria ou limpe a busca.'
-      :'Cadastre uma paciente ou importe sua planilha do Excel.',
-      state.pacientes.length?'':'<button class="btn p" data-act="ir-nova">'+I.plus(13)+
+    alvo.innerHTML=topo+vazio('&#10047;',
+      arqv?'Nenhuma paciente arquivada':(state.pacientes.length?'Nenhuma paciente neste filtro'
+        :'Nenhuma paciente cadastrada'),
+      arqv?'Quando um plano acabar, arquive a paciente aqui — a ficha inteira fica guardada.'
+        :(state.pacientes.length?'Tente outra categoria ou limpe a busca.'
+        :'Cadastre uma paciente ou importe sua planilha do Excel.'),
+      (state.pacientes.length||arqv)?'':'<button class="btn p" data-act="ir-nova">'+I.plus(13)+
       ' Cadastrar paciente</button>');
     ligarBusca(); return;
   }
+  if(arqv) topo2='<div class="note info" style="margin-bottom:20px">'+I.info(15)+
+    '<div>Pacientes arquivadas somem do Dashboard, do quadro semanal e das listas de máquina, '+
+    'mas continuam aqui com ciclos, condições e histórico intactos. Restaure quando ela voltar.</div></div>';
 
   let linhas='';
   lista.forEach(p=>{
     const sit=situacaoPac(p,hoje);
     const c=cat(p.categoriaId);
     const nc=(p.condicoes||[]).length;
-    linhas+='<tr><td><span class="nm">'+esc(p.nome)+'</span>'+
+    linhas+='<tr'+(p.arquivada?' style="opacity:.62"':'')+'><td><span class="nm">'+esc(p.nome)+'</span>'+
       (nc?' <span class="badge warn" title="'+nc+' condição(ões)">'+I.plane(11)+' '+nc+'</span>':'')+
       (p.obs?'<div style="font-size:11.5px;font-weight:300;color:var(--taupe);margin-top:2px;'+
         'max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.obs)+'</div>':'')+
@@ -1490,10 +1516,15 @@ function renderPac(){
       '<td class="acts">'+
         '<button class="btn q sm" data-act="ver" data-id="'+p.id+'" title="Ficha">'+I.eye(14)+'</button>'+
         '<button class="btn q sm" data-act="editar" data-id="'+p.id+'" title="Editar">'+I.edit(14)+'</button>'+
+        (p.arquivada
+          ? '<button class="btn q sm" data-act="restaurar" data-id="'+p.id+
+            '" title="Restaurar paciente">'+I.volta(14)+'</button>'
+          : '<button class="btn q sm" data-act="arquivar" data-id="'+p.id+'" title="Arquivar">'+
+            I.caixa(14)+'</button>')+
         '<button class="btn q sm" data-act="excluir" data-id="'+p.id+'" title="Excluir">'+I.trash(14)+'</button>'+
       '</td></tr>';
   });
-  alvo.innerHTML=topo+'<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>'+
+  alvo.innerHTML=topo+topo2+'<div class="tbl-wrap"><div class="tbl-scroll"><table><thead><tr>'+
     '<th>Paciente</th><th>Ciclos</th><th>Categoria</th><th>Situação</th>'+
     '<th>Próximo prazo</th><th>Máquinas</th><th></th>'+
     '</tr></thead><tbody>'+linhas+'</tbody></table></div></div>';
@@ -1545,7 +1576,9 @@ function formPaciente(p){
         (ed?esc(p.nome):'')+'"></div>'+
       '<div class="field full"><label>Ciclos de retorno</label>'+
         '<span class="hintx" style="margin-bottom:6px">Marque as áreas que ela faz — cada uma tem '+
-        'o próprio intervalo. Ela pode ter só uma, ou Facial de 15 dias e Corporal de 7, por exemplo.</span>'+
+        'o próprio intervalo. Pode ser só uma, ou Facial de 15 dias e Corporal de 7. '+
+        '<b style="font-weight:500">Pode deixar todas desmarcadas</b> — quem só vem nas máquinas '+
+        'temporárias não precisa de ciclo.</span>'+
         '<div class="areas" id="f-areas">'+blocosArea+'</div></div>'+
       '<div class="field"><label for="f-cat">Categoria</label><select id="f-cat">'+opts+'</select>'+
         '<span class="hintx">Só organiza a lista — não muda prazos.</span></div>'+
@@ -1574,8 +1607,14 @@ function formPaciente(p){
       '<button class="btn p" data-act="salvar-pac">'+I.check(13)+' '+
         (ed?'Salvar alterações':'Cadastrar paciente')+'</button>'+
       '<button class="btn g" data-act="cancelar-pac">Cancelar</button>'+
-      (ed?'<span style="flex:1"></span><button class="btn q" data-act="excluir" data-id="'+p.id+'">'+
-        I.trash(14)+' Excluir paciente</button>':'')+
+      (ed?'<span style="flex:1"></span>'+
+        (p.arquivada
+          ? '<button class="btn g" data-act="restaurar" data-id="'+p.id+'">'+I.volta(13)+
+            ' Restaurar</button>'
+          : '<button class="btn q" data-act="arquivar" data-id="'+p.id+'">'+I.caixa(14)+
+            ' Arquivar</button>')+
+        '<button class="btn q" data-act="excluir" data-id="'+p.id+'">'+
+        I.trash(14)+' Excluir</button>':'')+
     '</div></div>';
 }
 function renderCond(){
@@ -1636,11 +1675,9 @@ function salvarPaciente(){
   const hoje=D.hoje();
   const antigo=ui.editId?pac(ui.editId):null;
   const ciclos={facial:null,corporal:null,capilar:null};
-  let algum=false;
   for(const a of AREAS){
     const cb=document.querySelector('#f-areas input[data-ak="'+a.k+'"]');
     if(!cb||!cb.checked) continue;
-    algum=true;
     const freq=+document.querySelector('#f-areas .radios[data-rk="'+a.k+'"] label.on').dataset.freq;
     const ult=document.getElementById('f-ult-'+a.k).value||null;
     if(ult&&ult>hoje){ toast('O último atendimento '+a.nome.toLowerCase()+
@@ -1651,8 +1688,6 @@ function salvarPaciente(){
          naoRespondeu:ant.naoRespondeu}
       : novoCiclo(freq,ult);
   }
-  if(!algum){ toast('Marque pelo menos uma área — Facial, Corporal ou Capilar.',true); return; }
-
   const catId=document.getElementById('f-cat').value||null;
   const obs=document.getElementById('f-obs').value.trim();
   const maqs=[].slice.call(document.querySelectorAll('#f-maq input:checked')).map(x=>x.value);
@@ -1861,7 +1896,7 @@ function renderMaq(){
 }
 function modalPacMaq(mid){
   const m=maq(mid); if(!m) return;
-  const lista=state.pacientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
+  const lista=ativas().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR'));
   abrir(cabecaModal('Pacientes de '+esc(m.nome),
     'Marque quem deve ser chamada toda vez que esta máquina vier')+
     '<div class="modal-body">'+
@@ -2094,7 +2129,8 @@ function modalFicha(id){
         const rot={sessao:'Sessão realizada',agendou:'Agendamento marcado',
           nao_respondeu:'Não respondeu',desmarcou:'Agendamento desfeito',
           fu:'Follow-up feito',importado:'Importada da planilha',
-          maq_agendou:'Confirmada na máquina',maq_proxima:'Adiada para a próxima vinda'}[x.tipo]||x.tipo;
+          maq_agendou:'Confirmada na máquina',maq_proxima:'Adiada para a próxima vinda',
+          arquivou:'Paciente arquivada',restaurou:'Paciente restaurada'}[x.tipo]||x.tipo;
         const det=x.area?' · '+area(x.area).nome:(x.maquina?' · '+esc(x.maquina):'');
         return '<div style="display:flex;gap:12px;font-size:12.5px;align-items:baseline">'+
           '<span style="font-family:var(--serif);font-size:14px;font-weight:600;color:var(--teal);'+
@@ -2114,8 +2150,12 @@ function modalFicha(id){
   }
   const fu=state.followups.filter(f=>f.pacienteId===p.id).sort((a,b)=>b.data.localeCompare(a.data));
 
-  abrir(cabecaModal(esc(p.nome),'Ficha completa')+
+  abrir(cabecaModal(esc(p.nome),p.arquivada?'Ficha arquivada':'Ficha completa')+
     '<div class="modal-body">'+
+      (p.arquivada?'<div class="note info" style="margin-bottom:18px">'+I.caixa(15)+
+        '<div><b>Paciente arquivada'+(p.arquivadaEm?' em '+D.br(p.arquivadaEm):'')+'.</b> '+
+        'Ela não aparece no Dashboard nem nas listas de máquina. Tudo aqui foi preservado — '+
+        'é só restaurar quando ela voltar.</div></div>':'')+
       '<div class="card-meta">'+sitGeral.html+selCat(p)+selMaqs(p)+selCond(p,hoje)+'</div>'+
       bl('Ciclos',ciclosHTML)+
       bl('Observações',p.obs?'<div class="card-obs" style="margin:0">'+esc(p.obs)+'</div>'
@@ -2140,7 +2180,13 @@ function modalFicha(id){
     '<div class="modal-foot">'+
       '<button class="btn q" data-act="excluir" data-id="'+p.id+'">'+I.trash(14)+' Excluir</button>'+
       '<span class="sep"></span>'+
-      '<button class="btn p" data-act="editar" data-id="'+p.id+'">'+I.edit(13)+' Editar ficha</button>'+
+      (p.arquivada
+        ? '<button class="btn p" data-act="restaurar" data-id="'+p.id+'">'+I.volta(13)+
+          ' Restaurar paciente</button>'
+        : '<button class="btn g" data-act="arquivar" data-id="'+p.id+'">'+I.caixa(13)+
+          ' Arquivar</button>'+
+          '<button class="btn p" data-act="editar" data-id="'+p.id+'">'+I.edit(13)+
+          ' Editar ficha</button>')+
     '</div>',true);
 }
 
@@ -2257,13 +2303,11 @@ function processarAOA(aoa,nomeArq){
     if(!nome||/^exemplo/i.test(nome)) continue;
     const cic={};
     AREAK.forEach(k=>{ cic[k]=mapa[k]!=null?parseFreqOpt(r[mapa[k]]):null; });
-    let assumido=false;
-    if(!AREAK.some(k=>cic[k])){
-      const leg=mapa.freq!=null?parseFreqOpt(r[mapa.freq]):null;
+    if(!AREAK.some(k=>cic[k])&&mapa.freq!=null){
+      const leg=parseFreqOpt(r[mapa.freq]);
       if(leg) cic.facial=leg;
-      else { cic.facial=15; assumido=true; }
     }
-    const it={nome:nome,ciclos:cic,assumido:assumido,
+    const it={nome:nome,ciclos:cic,
       catNome:mapa.cat!=null?String(r[mapa.cat]||'').trim():'',
       maqNomes:mapa.maq!=null?String(r[mapa.maq]||'').split(/[,;\/|]/)
         .map(s=>s.trim()).filter(Boolean):[],
@@ -2291,17 +2335,18 @@ function processarAOA(aoa,nomeArq){
     '<th>Ciclos</th><th>Categoria</th><th>Máquinas</th><th>Último atend.</th>'+
     '<th>Observações</th><th>Situação</th></tr></thead><tbody>'+
     linhas.slice(0,80).map(l=>'<tr><td><span class="nm">'+esc(l.nome)+'</span></td>'+
-      '<td>'+AREAK.filter(k=>l.ciclos[k]).map(k=>'<span class="badge cat" style="background:'+
-        area(k).cor+'22"><i style="background:'+area(k).cor+'"></i>'+area(k).nome+' '+
-        l.ciclos[k]+'d</span>').join(' ')+'</td>'+
+      '<td>'+(AREAK.some(k=>l.ciclos[k])
+        ? AREAK.filter(k=>l.ciclos[k]).map(k=>'<span class="badge cat" style="background:'+
+          area(k).cor+'22"><i style="background:'+area(k).cor+'"></i>'+area(k).nome+' '+
+          l.ciclos[k]+'d</span>').join(' ')
+        : '<span class="badge soft">'+(l.maqNomes.length?'Só máquinas':'Sem ciclo')+'</span>')+'</td>'+
       '<td>'+(l.catNome?esc(l.catNome):'—')+'</td>'+
       '<td>'+(l.maqNomes.length?esc(l.maqNomes.join(', ')):'—')+'</td>'+
       '<td>'+(l.ult?D.br(l.ult):'—')+'</td>'+
       '<td style="max-width:230px;font-weight:300;font-size:12.5px">'+(esc(l.obs)||'—')+'</td>'+
       '<td>'+(l.acao==='nova'?'<span class="badge ok">Nova</span>'
         :'<span class="badge soft">Atualizar</span>')+
-      (l.aviso?' <span class="badge warn">'+l.aviso+'</span>':'')+
-      (l.assumido?' <span class="badge warn">facial 15d assumido</span>':'')+'</td></tr>').join('')+
+      (l.aviso?' <span class="badge warn">'+l.aviso+'</span>':'')+'</td></tr>').join('')+
     '</tbody></table></div></div>'+
     (linhas.length>80?'<span class="hintx">Mostrando as 80 primeiras — todas as '+linhas.length+
       ' serão importadas.</span>':'')+
@@ -2371,7 +2416,8 @@ function renderDados(){
       : '<div class="note warn" style="margin-bottom:26px">'+I.warn(15)+'<div><b>Sem conexão com a '+
         'planilha.</b> Suas alterações estão guardadas nesta aba e sobem sozinhas assim que a internet '+
         'voltar. Não feche a página até o rodapé voltar a dizer “Sincronizado”.</div></div>')+
-    '<div class="stats">'+stat(state.pacientes.length,'Pacientes','hi')+
+    '<div class="stats">'+stat(ativas().length,'Pacientes ativas','hi')+
+      stat(arquivadas().length,'Arquivadas','')+
       stat(state.categorias.length,'Categorias','')+
       stat(state.maquinas.length,'Máquinas','')+
       stat(fuP,'Follow-ups pendentes','')+
@@ -2415,7 +2461,8 @@ function expXlsx(){
   const aoa=[['Nome','Facial','Último facial','Corporal','Último corporal','Capilar',
               'Último capilar','Categoria','Máquinas','Próximo prazo','Situação',
               'Condições','Observações']];
-  state.pacientes.slice().sort((a,b)=>a.nome.localeCompare(b.nome,'pt-BR')).forEach(p=>{
+  state.pacientes.slice().sort((a,b)=>
+    (a.arquivada?1:0)-(b.arquivada?1:0)||a.nome.localeCompare(b.nome,'pt-BR')).forEach(p=>{
     const c=cat(p.categoriaId), s=situacaoPac(p,hoje);
     const cel=k=>{ const cc=ciclo(p,k); return cc?cc.freq:''; };
     const ult=k=>{ const cc=ciclo(p,k); return cc&&cc.ultimo?D.br(cc.ultimo):''; };
@@ -2500,6 +2547,16 @@ function demo(){
   state.vindas=[vHar,
     {id:uid(),maquinaId:sop.id,data:D.add(h,26),obs:'',resp:{},criadoEm:h},
     {id:uid(),maquinaId:har.id,data:D.add(h,-20),obs:'',resp:{},criadoEm:h}];
+  /* exclusiva das máquinas — nenhum ciclo de retorno */
+  const iso=mk('Isadora M.',2,{facial:null,corporal:null,capilar:null},
+    'Só faz as máquinas quando elas vêm — sem pacote na clínica.');
+  iso.maquinas=[sop.id,har.id];
+  /* arquivada — plano encerrado */
+  const joa=mk('Joana R.',1,{facial:null,corporal:novoCiclo(15,D.add(h,-62)),capilar:null},
+    'Plano encerrado. Falou em voltar depois das férias.');
+  joa.arquivada=true; joa.arquivadaEm=D.add(h,-12);
+  joa.historico.push({tipo:'arquivou',data:D.add(h,-12),em:D.add(h,-12)});
+  state.pacientes.push(iso,joa);
   state.seedMaq=true;
   salvar(); maturar(); tudo();
   toast('Exemplo carregado — veja o Dashboard.');
@@ -2588,6 +2645,30 @@ document.addEventListener('click',e=>{
       const f=state.followups.find(x=>x.id===id); if(!f) break;
       state.followups=state.followups.filter(x=>x.id!==id); salvar(); tudo();
       toast('Follow-up removido.'); break; }
+    case 'arquivar': {
+      const p=pac(id); if(!p) break;
+      const nfu=state.followups.filter(x=>x.pacienteId===id&&!x.feito).length;
+      confirmar('Arquivar '+esc(p.nome)+'?',
+        'Ela sai do Dashboard, do quadro semanal e das listas de máquina. Os ciclos, as condições '+
+        'e o histórico ficam guardados — é só restaurar quando ela voltar.'+
+        (nfu?' O'+(nfu>1?'s '+nfu+' follow-ups pendentes serão removidos':
+          ' follow-up pendente será removido')+'.':''),
+        'Arquivar',()=>{
+          p.arquivada=true; p.arquivadaEm=D.hoje();
+          p.historico.push({tipo:'arquivou',data:D.hoje(),em:D.hoje()});
+          state.followups=state.followups.filter(x=>!(x.pacienteId===id&&!x.feito));
+          if(ui.editId===id){ ui.editId=null; ui.pacSub='arquivadas'; }
+          fechar(); salvar(); tudo(); toast(p.nome+' arquivada.');
+        });
+      break; }
+    case 'restaurar': {
+      const p=pac(id); if(!p) break;
+      p.arquivada=false; p.arquivadaEm=null;
+      p.historico.push({tipo:'restaurou',data:D.hoje(),em:D.hoje()});
+      if(ui.pacSub==='arquivadas'&&!arquivadas().length) ui.pacSub='todas';
+      fechar(); salvar(); tudo();
+      toast(p.nome+' voltou para a lista ativa.');
+      break; }
     case 'salvar-pac': salvarPaciente(); break;
     case 'cancelar-pac': ui.editId=null; ui.pacSub='todas'; renderPac(); break;
     case 'cond-add': ui.condTmp.push({texto:'',inicio:'',fim:''}); renderCond(); break;

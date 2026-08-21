@@ -1,0 +1,599 @@
+/* =====================================================================
+   FloreSer · Corpo e Alma — painel de manutenção
+   ---------------------------------------------------------------------
+   Ferramenta interna de diagnóstico. A entrada é discreta, mas discrição
+   não é proteção: nada aqui é mostrado antes de o Apps Script conferir a
+   senha e devolver uma credencial temporária. A senha não existe neste
+   arquivo, só viaja para o servidor.
+   ===================================================================== */
+
+(function (global) {
+  "use strict";
+
+  var URL_API = "https://script.google.com/macros/s/AKfycbzy9WCfP4l08dn2h2K34uEL6e0mqFBjVMugcHiTc0oUGmpS7gOJjbxs58CB87AoFUw-/exec";
+  var CHAVE = "floreser.cred";
+  var PACIENCIA = 8000;      // ms de tolerância entre um toque e o seguinte
+  var POR_PAGINA = 50;
+
+  var registrar = (global.FloreSerLogs && global.FloreSerLogs.registrar) || function () { };
+
+  /* ---------------------------------------------------- utilidades */
+
+  function esc(t) {
+    return String(t === undefined || t === null ? "" : t).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+
+  function tentar(f, padrao) {
+    try {
+      var v = f();
+      return v === undefined || v === null || v === "" ? padrao : v;
+    } catch (e) {
+      return padrao;
+    }
+  }
+
+  function credencial(valor) {
+    if (valor === undefined) return tentar(function () { return sessionStorage.getItem(CHAVE); }, null);
+    tentar(function () {
+      if (valor === null) sessionStorage.removeItem(CHAVE);
+      else sessionStorage.setItem(CHAVE, valor);
+      return true;
+    }, false);
+  }
+
+  function chamar(corpo) {
+    return fetch(URL_API, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(corpo),
+      redirect: "follow",
+    }).then(function (r) { return r.json(); });
+  }
+
+  /* mostra "Não disponível" em vez de vazio, sem inventar valor */
+  function valor(v, sufixo) {
+    if (v === undefined || v === null || v === "" ) {
+      return '<div class="val ausente">Não disponível</div>';
+    }
+    return '<div class="val">' + esc(v) + esc(sufixo || "") + "</div>";
+  }
+
+  function cartao(rotulo, v, classe) {
+    return '<div class="cartao"><div class="rot">' + esc(rotulo) + "</div>" +
+      (classe ? '<div class="val ' + classe + '">' + esc(v) + "</div>" : valor(v)) + "</div>";
+  }
+
+  function dataHora(iso) {
+    if (!iso) return "";
+    var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})T?(\d{2})?:?(\d{2})?:?(\d{2})?/);
+    if (!m) return String(iso);
+    return m[3] + "/" + m[2] + "/" + m[1] + (m[4] ? " " + m[4] + ":" + m[5] + ":" + (m[6] || "00") : "");
+  }
+
+  function ambiente() {
+    var h = tentar(function () { return location.hostname; }, "");
+    if (!h) return "Arquivo local";
+    if (h === "localhost" || h === "127.0.0.1") return "Teste local";
+    if (h.indexOf("github.io") >= 0) return "Produção · GitHub Pages";
+    return h;
+  }
+
+  function pesoDaPagina() {
+    return tentar(function () {
+      var recursos = performance.getEntriesByType("resource") || [];
+      var nav = (performance.getEntriesByType("navigation") || [])[0];
+      var total = (nav && nav.transferSize ? nav.transferSize : 0);
+      recursos.forEach(function (r) { total += r.transferSize || 0; });
+      return total ? Math.round(total / 1024) + " KB (aprox.)" : "";
+    }, "");
+  }
+
+  /* ---------------------------------------------------- a entrada */
+
+  var passo = 0;
+  var prazo = null;
+
+  function zerar() {
+    passo = 0;
+    if (prazo) { clearTimeout(prazo); prazo = null; }
+  }
+
+  function esperado() {
+    return passo === 0 ? '#marca-titulo span[data-p="1"]'
+      : passo === 1 ? '#marca-titulo span[data-p="2"]'
+        : "#versao-atual";
+  }
+
+  document.addEventListener("click", function (e) {
+    var alvo = e.target;
+    if (!alvo || !alvo.matches) return;
+    if (alvo.matches(esperado())) {
+      passo++;
+      if (prazo) clearTimeout(prazo);
+      if (passo >= 3) {
+        zerar();
+        iniciar();
+        return;
+      }
+      prazo = setTimeout(zerar, PACIENCIA);
+      return;
+    }
+    zerar();
+  });
+
+  /* ---------------------------------------------------- autenticação */
+
+  var dlgEntrada = null;
+
+  function iniciar() {
+    registrar("DEV_TENTATIVA", { nivel: "SECURITY", mensagem: "Entrada do painel solicitada" });
+    var cred = credencial();
+    if (cred) {
+      abrirPainel();
+      return;
+    }
+    pedirSenha();
+  }
+
+  function pedirSenha() {
+    if (!dlgEntrada) {
+      dlgEntrada = document.createElement("dialog");
+      dlgEntrada.className = "entrada-tecnica";
+      dlgEntrada.innerHTML =
+        '<div class="janela-topo"><h2>Manutenção</h2>' +
+        '<button class="fechar" type="button" data-sai="1" aria-label="Fechar">&#10005;</button></div>' +
+        '<div class="janela-corpo"><p>Área técnica do sistema. Informe a senha de manutenção ' +
+        "para continuar.</p>" +
+        '<input type="password" id="cred-senha" autocomplete="off" placeholder="Senha de manutenção" ' +
+        'enterkeyhint="go"><div class="aviso" id="cred-aviso"></div>' +
+        '<button class="botao-cheio" id="cred-ok" type="button">Entrar</button></div>';
+      document.body.appendChild(dlgEntrada);
+
+      dlgEntrada.querySelector("[data-sai]").addEventListener("click", function () { fechar(dlgEntrada); });
+      dlgEntrada.querySelector("#cred-ok").addEventListener("click", enviarSenha);
+      dlgEntrada.querySelector("#cred-senha").addEventListener("keydown", function (ev) {
+        if (ev.key === "Enter") enviarSenha();
+      });
+    }
+    dlgEntrada.querySelector("#cred-senha").value = "";
+    dlgEntrada.querySelector("#cred-aviso").textContent = "";
+    abrir(dlgEntrada);
+    tentar(function () { dlgEntrada.querySelector("#cred-senha").focus(); return true; }, false);
+  }
+
+  function enviarSenha() {
+    var campo = dlgEntrada.querySelector("#cred-senha");
+    var aviso = dlgEntrada.querySelector("#cred-aviso");
+    var botao = dlgEntrada.querySelector("#cred-ok");
+    var senha = (campo.value || "").trim();
+    if (!senha) { campo.focus(); return; }
+
+    botao.disabled = true;
+    botao.textContent = "Conferindo…";
+    aviso.textContent = "";
+
+    chamar({ acao: "dev_entrar", senha: senha }).then(function (r) {
+      if (r && r.ok) {
+        credencial(r.token);
+        campo.value = "";
+        fechar(dlgEntrada);
+        abrirPainel();
+        return;
+      }
+      if (r && r.erro === "bloqueado") {
+        aviso.textContent = "Bloqueado por tentativas seguidas. Tente em " + (r.minutos || 15) + " min.";
+      } else if (r && r.erro === "senha") {
+        aviso.textContent = "Senha incorreta." + (r.restam ? " Restam " + r.restam + "." : "");
+      } else {
+        aviso.textContent = "Não foi possível falar com o servidor.";
+      }
+      campo.value = "";
+      campo.focus();
+    }).catch(function () {
+      aviso.textContent = "Sem conexão com o servidor.";
+    }).then(function () {
+      botao.disabled = false;
+      botao.textContent = "Entrar";
+    });
+  }
+
+  /* ---------------------------------------------------- janelas */
+
+  function abrir(d) {
+    if (typeof d.showModal === "function") d.showModal();
+    else d.setAttribute("open", "");
+    document.body.style.overflow = "hidden";
+  }
+
+  function fechar(d) {
+    if (typeof d.close === "function" && d.open) d.close();
+    else d.removeAttribute("open");
+    document.body.style.overflow = "";
+  }
+
+  /* ---------------------------------------------------- painel */
+
+  var dlgPainel = null;
+  var relogio = null;
+  var base = { logs: [], sessoes: [], resumo: {} };
+  var aba = "visao";
+  var ordemDesc = true;
+  var limite = POR_PAGINA;
+  var selecionado = null;
+
+  function abrirPainel() {
+    if (!dlgPainel) montarPainel();
+    abrir(dlgPainel);
+    trocarAba("visao");
+    carregar();
+    relogio = setInterval(function () {
+      var el = document.getElementById("relogio");
+      if (el) el.textContent = new Date().toLocaleTimeString("pt-BR");
+    }, 1000);
+  }
+
+  function montarPainel() {
+    dlgPainel = document.createElement("dialog");
+    dlgPainel.className = "painel";
+    dlgPainel.setAttribute("aria-label", "Painel de manutenção");
+    dlgPainel.innerHTML =
+      '<div class="janela-topo"><h2>Manutenção</h2>' +
+      '<span class="selo" id="painel-selo"></span>' +
+      '<button class="fechar" type="button" data-sai="1" aria-label="Fechar painel">&#10005;</button></div>' +
+      '<div class="abas">' +
+      '<button data-aba="visao" class="on">Visão geral</button>' +
+      '<button data-aba="logs">Logs</button>' +
+      '<button data-aba="acessos">Acessos</button>' +
+      '<button data-aba="sistema">Sistema</button>' +
+      "</div>" +
+      '<div class="janela-corpo" id="painel-corpo" tabindex="0"></div>';
+    document.body.appendChild(dlgPainel);
+
+    dlgPainel.querySelector("[data-sai]").addEventListener("click", function () {
+      fechar(dlgPainel);
+      if (relogio) { clearInterval(relogio); relogio = null; }
+    });
+
+    dlgPainel.addEventListener("close", function () {
+      if (relogio) { clearInterval(relogio); relogio = null; }
+      document.body.style.overflow = "";
+    });
+
+    Array.prototype.forEach.call(dlgPainel.querySelectorAll("[data-aba]"), function (b) {
+      b.addEventListener("click", function () { trocarAba(b.getAttribute("data-aba")); });
+    });
+  }
+
+  function trocarAba(qual) {
+    aba = qual;
+    Array.prototype.forEach.call(dlgPainel.querySelectorAll("[data-aba]"), function (b) {
+      b.className = b.getAttribute("data-aba") === qual ? "on" : "";
+    });
+    desenhar();
+  }
+
+  function carregar() {
+    var corpo = document.getElementById("painel-corpo");
+    if (corpo && !base.logs.length) corpo.innerHTML = '<div class="vazio">Carregando registros…</div>';
+
+    chamar({ acao: "dev_dados", token: credencial() }).then(function (r) {
+      if (r && r.erro === "sessao") {
+        credencial(null);
+        fechar(dlgPainel);
+        pedirSenha();
+        return;
+      }
+      if (r && r.ok) {
+        base = r.dados || base;
+        desenhar();
+        return;
+      }
+      base = { logs: [], sessoes: [], resumo: {} };
+      desenhar("Não foi possível ler os registros no servidor.");
+    }).catch(function () {
+      desenhar("Sem conexão com o servidor. O painel está mostrando só o que este aparelho sabe.");
+    });
+  }
+
+  function desenhar(recado) {
+    var corpo = document.getElementById("painel-corpo");
+    if (!corpo) return;
+    var selo = document.getElementById("painel-selo");
+    if (selo) selo.textContent = (base.resumo && base.resumo.servidor) ? "Servidor · " + base.resumo.servidor : "";
+
+    var html = recado ? '<div class="nota-privacidade">' + esc(recado) + "</div>" : "";
+    if (aba === "visao") html += visaoGeral();
+    else if (aba === "logs") html += telaLogs();
+    else if (aba === "acessos") html += telaAcessos();
+    else html += telaSistema();
+
+    corpo.innerHTML = html;
+    corpo.scrollTop = 0;
+    ligarEventos();
+  }
+
+  /* ---------------------------------------------------- visão geral */
+
+  function visaoGeral() {
+    var v = global.FLORESER || {};
+    var atual = v.atual || {};
+    var s = tentar(function () { return global.FloreSerLogs.sessao(); }, {});
+    var e = tentar(function () { return global.FloreSerLogs.estado(); }, {});
+    var arm = tentar(function () { return global.FloreSerLogs.armazenamento(); }, null);
+    var resumo = base.resumo || {};
+
+    var aberturas = (base.logs || []).filter(function (l) {
+      return /_ABERTO$/.test(l.evento || "");
+    }).length;
+
+    var estadoApi = e.envio === "ok" ? "Respondendo"
+      : e.envio === "erro" ? "Sem resposta"
+        : (base.logs && base.logs.length ? "Respondendo" : "Sem envio ainda");
+
+    return '<div class="titulo-secao">Versão publicada</div><div class="grade">' +
+      cartao("Versão", "v" + (atual.versao || "?"), "destaque") +
+      cartao("Codinome", atual.codinome) +
+      cartao("Data da versão", atual.data) +
+      cartao("Página atual", tentar(function () { return location.pathname.split("/").pop() || "index.html"; }, "")) +
+      "</div>" +
+
+      '<div class="titulo-secao">Agora</div><div class="grade">' +
+      '<div class="cartao"><div class="rot">Horário do sistema</div>' +
+      '<div class="val" id="relogio">' + esc(new Date().toLocaleTimeString("pt-BR")) + "</div></div>" +
+      cartao("Horário do servidor", resumo.servidor) +
+      cartao("Estado da API", estadoApi) +
+      cartao("Ambiente", ambiente()) +
+      "</div>" +
+
+      '<div class="titulo-secao">Registros</div><div class="grade">' +
+      cartao("Sessões registradas", String((base.sessoes || []).length), "destaque") +
+      cartao("Aberturas registradas", String(aberturas), "destaque") +
+      cartao("Eventos guardados", String((base.logs || []).length), "destaque") +
+      cartao("Último acesso", dataHora(resumo.ultimoAcesso)) +
+      "</div>" +
+
+      '<div class="titulo-secao">Este aparelho</div><div class="grade">' +
+      cartao("Armazenamento", arm ? (arm.local && arm.sessao ? "Disponível"
+        : arm.local || arm.sessao ? "Parcial" : "Bloqueado") : "") +
+      cartao("Peso da página", pesoDaPagina()) +
+      cartao("Sessão", s.id) +
+      cartao("User Agent", tentar(function () { return navigator.userAgent; }, "")) +
+      "</div>" +
+
+      '<div class="nota-privacidade">Os registros guardam identificadores sorteados, nunca nomes. ' +
+      "Ficam na planilha por até " + esc(resumo.retencao || 90) + " dias e só aparecem aqui, " +
+      "depois da senha de manutenção.</div>";
+  }
+
+  /* ---------------------------------------------------- logs */
+
+  var filtros = { busca: "", nivel: "", pagina: "" };
+
+  function logsFiltrados() {
+    var lista = (base.logs || []).filter(function (l) {
+      if (filtros.nivel && l.nivel !== filtros.nivel) return false;
+      if (filtros.pagina && l.pagina !== filtros.pagina) return false;
+      if (filtros.busca) {
+        var alvo = ((l.evento || "") + " " + (l.mensagem || "") + " " + (l.versao || "")).toLowerCase();
+        if (alvo.indexOf(filtros.busca.toLowerCase()) < 0) return false;
+      }
+      return true;
+    });
+    lista.sort(function (a, b) {
+      var x = String(a.quando || ""), y = String(b.quando || "");
+      return ordemDesc ? y.localeCompare(x) : x.localeCompare(y);
+    });
+    return lista;
+  }
+
+  function telaLogs() {
+    var paginas = {};
+    (base.logs || []).forEach(function (l) { if (l.pagina) paginas[l.pagina] = 1; });
+
+    var lista = logsFiltrados();
+    var mostrando = lista.slice(0, limite);
+
+    var html = '<div class="ferramentas">' +
+      '<input type="search" id="f-busca" placeholder="Pesquisar evento ou mensagem…" value="' +
+      esc(filtros.busca) + '">' +
+      '<select id="f-nivel"><option value="">Todos os níveis</option>' +
+      ["INFO", "WARNING", "ERROR", "SECURITY"].map(function (n) {
+        return '<option value="' + n + '"' + (filtros.nivel === n ? " selected" : "") + ">" + n + "</option>";
+      }).join("") + "</select>" +
+      '<select id="f-pagina"><option value="">Todas as páginas</option>' +
+      Object.keys(paginas).sort().map(function (p) {
+        return '<option value="' + esc(p) + '"' + (filtros.pagina === p ? " selected" : "") + ">" +
+          esc(p) + "</option>";
+      }).join("") + "</select>" +
+      '<button class="btn-fino" id="f-ordem">' + (ordemDesc ? "Mais novos ▾" : "Mais antigos ▴") + "</button>" +
+      '<button class="btn-fino" id="f-atualizar">Atualizar</button>' +
+      '<button class="btn-fino perigo" id="f-limpar">Limpar</button>' +
+      "</div>";
+
+    if (!mostrando.length) {
+      return html + '<div class="vazio">Nenhum registro para este filtro.</div>';
+    }
+
+    html += '<table class="tabela"><thead><tr>' +
+      '<th class="ordenavel" id="th-data">Quando</th><th>Nível</th><th>Evento</th>' +
+      "<th>Página</th><th>Mensagem</th></tr></thead><tbody>" +
+      mostrando.map(function (l, i) {
+        return '<tr data-linha="' + i + '">' +
+          '<td class="quando">' + esc(dataHora(l.quando)) + "</td>" +
+          '<td><span class="nivel ' + esc(l.nivel) + '">' + esc(l.nivel) + "</span></td>" +
+          '<td class="evento">' + esc(l.evento) + "</td>" +
+          "<td>" + esc(l.pagina) + "</td>" +
+          "<td>" + esc(l.mensagem) + "</td></tr>";
+      }).join("") + "</tbody></table>";
+
+    if (lista.length > limite) {
+      html += '<div style="text-align:center;margin-top:14px">' +
+        '<button class="btn-fino" id="f-mais">Mostrar mais (' + (lista.length - limite) + " restantes)</button></div>";
+    }
+
+    if (selecionado) {
+      html += '<div class="detalhe">' + esc(
+        "ID:        " + selecionado.id + "\n" +
+        "Quando:    " + dataHora(selecionado.quando) + "\n" +
+        "Nível:     " + selecionado.nivel + "\n" +
+        "Evento:    " + selecionado.evento + "\n" +
+        "Página:    " + selecionado.pagina + "\n" +
+        "Versão:    " + (selecionado.versao || "—") + "\n" +
+        "Sessão:    " + (selecionado.sessao || "—") + "\n\n" +
+        selecionado.mensagem) + "</div>";
+    }
+
+    return html;
+  }
+
+  /* ---------------------------------------------------- acessos */
+
+  function blocoSessao(s, titulo) {
+    function linha(rot, v) {
+      return '<div class="cartao"><div class="rot">' + esc(rot) + "</div>" + valor(v) + "</div>";
+    }
+    return '<div class="sessao-bloco"><h4>' + esc(titulo || s.id) + "</h4>" +
+      '<div class="resumo">' + esc(s.paginas || "1") + " página(s) · entrou por " +
+      esc(s.entrada || "—") + " · " + esc(s.versao || "versão não registrada") + "</div>" +
+      '<div class="grade">' +
+      linha("Primeiro acesso", dataHora(s.primeiroAcesso)) +
+      linha("Último acesso", dataHora(s.ultimoAcesso)) +
+      linha("Página atual", s.atual) +
+      linha("Origem", s.referrer) +
+      linha("Navegador", s.navegador) +
+      linha("Plataforma", s.plataforma) +
+      linha("Idioma", s.idioma) +
+      linha("Idiomas aceitos", s.idiomas) +
+      linha("Cookies", s.cookies) +
+      linha("Tela", s.tela) +
+      linha("Janela", s.viewport) +
+      linha("Densidade", s.dpr) +
+      linha("Toque", s.toque) +
+      linha("Tipo de aparelho", s.tipo) +
+      linha("Fuso", s.fuso) +
+      linha("Conexão", s.conexao) +
+      linha("Memória", s.memoria) +
+      linha("Processadores", s.nucleos) +
+      linha("Não rastrear", s.dnt) +
+      "</div></div>";
+  }
+
+  function telaAcessos() {
+    var minha = tentar(function () { return global.FloreSerLogs.sessao(); }, null);
+    var html = '<div class="nota-privacidade">Só o que o navegador entrega sem pedir permissão. ' +
+      "Sem localização, sem câmera, sem microfone e sem identificação pessoal — o identificador " +
+      "da sessão é sorteado.</div>";
+
+    if (minha) html += '<div class="titulo-secao">Esta sessão</div>' + blocoSessao(minha, "Esta sessão · " + minha.id);
+
+    var outras = (base.sessoes || []).filter(function (s) { return !minha || s.id !== minha.id; });
+    html += '<div class="titulo-secao">Sessões registradas (' + outras.length + ")</div>";
+    if (!outras.length) return html + '<div class="vazio">Nenhuma outra sessão registrada ainda.</div>';
+    return html + outras.slice(0, 40).map(function (s) { return blocoSessao(s); }).join("");
+  }
+
+  /* ---------------------------------------------------- sistema */
+
+  function telaSistema() {
+    var s = tentar(function () { return global.FloreSerLogs.sessao(); }, {});
+    var e = tentar(function () { return global.FloreSerLogs.estado(); }, {});
+    var arm = tentar(function () { return global.FloreSerLogs.armazenamento(); }, null);
+    var v = global.FLORESER || {};
+    var atual = v.atual || {};
+    var resumo = base.resumo || {};
+
+    return '<div class="titulo-secao">Navegador</div><div class="grade">' +
+      cartao("Navegador", s.navegador) +
+      cartao("Plataforma", s.plataforma) +
+      cartao("Idioma", s.idioma) +
+      cartao("Cookies", s.cookies) +
+      cartao("Não rastrear", s.dnt) +
+      cartao("User Agent", tentar(function () { return navigator.userAgent; }, "")) +
+      "</div>" +
+
+      '<div class="titulo-secao">Tela e aparelho</div><div class="grade">' +
+      cartao("Tela", s.tela) +
+      cartao("Janela", s.viewport) +
+      cartao("Densidade", s.dpr) +
+      cartao("Toque", s.toque) +
+      cartao("Tipo", s.tipo) +
+      cartao("Orientação", tentar(function () { return screen.orientation.type; }, "")) +
+      "</div>" +
+
+      '<div class="titulo-secao">Ambiente</div><div class="grade">' +
+      cartao("Endereço", ambiente()) +
+      cartao("Fuso", s.fuso) +
+      cartao("Conexão", s.conexao) +
+      cartao("Memória", s.memoria) +
+      cartao("Processadores", s.nucleos) +
+      cartao("Online", tentar(function () { return navigator.onLine ? "sim" : "não"; }, "")) +
+      "</div>" +
+
+      '<div class="titulo-secao">Site</div><div class="grade">' +
+      cartao("Versão", "v" + (atual.versao || "?") + " — " + (atual.codinome || "")) +
+      cartao("Publicada em", atual.data) +
+      cartao("Peso da página", pesoDaPagina()) +
+      cartao("Armazenamento", arm ? (arm.local && arm.sessao ? "Disponível"
+        : arm.local || arm.sessao ? "Parcial" : "Bloqueado") : "") +
+      cartao("Envios pendentes", String(e.pendentes === undefined ? "" : e.pendentes)) +
+      cartao("Eventos enviados", String(e.enviados === undefined ? "" : e.enviados)) +
+      "</div>" +
+
+      '<div class="titulo-secao">Planilha</div><div class="grade">' +
+      cartao("Revisão do CRM", String(resumo.revCRM === undefined ? "" : resumo.revCRM)) +
+      cartao("Revisão da agenda", String(resumo.revAgenda === undefined ? "" : resumo.revAgenda)) +
+      cartao("Retenção", resumo.retencao ? resumo.retencao + " dias" : "") +
+      cartao("Horário do servidor", resumo.servidor) +
+      "</div>";
+  }
+
+  /* ---------------------------------------------------- eventos da tela */
+
+  function ligarEventos() {
+    var corpo = document.getElementById("painel-corpo");
+    if (!corpo) return;
+
+    function em(id, evento, f) {
+      var el = corpo.querySelector(id);
+      if (el) el.addEventListener(evento, f);
+    }
+
+    em("#f-busca", "input", function (ev) { filtros.busca = ev.target.value; limite = POR_PAGINA; desenhar(); });
+    em("#f-nivel", "change", function (ev) { filtros.nivel = ev.target.value; limite = POR_PAGINA; desenhar(); });
+    em("#f-pagina", "change", function (ev) { filtros.pagina = ev.target.value; limite = POR_PAGINA; desenhar(); });
+    em("#f-ordem", "click", function () { ordemDesc = !ordemDesc; desenhar(); });
+    em("#th-data", "click", function () { ordemDesc = !ordemDesc; desenhar(); });
+    em("#f-mais", "click", function () { limite += POR_PAGINA; desenhar(); });
+    em("#f-atualizar", "click", function () { selecionado = null; carregar(); });
+    em("#f-limpar", "click", limpar);
+
+    Array.prototype.forEach.call(corpo.querySelectorAll("[data-linha]"), function (tr) {
+      tr.addEventListener("click", function () {
+        var i = Number(tr.getAttribute("data-linha"));
+        var lista = logsFiltrados().slice(0, limite);
+        selecionado = (selecionado && lista[i] && selecionado.id === lista[i].id) ? null : lista[i];
+        desenhar();
+      });
+    });
+  }
+
+  function limpar() {
+    if (!global.confirm("Apagar todos os registros de log da planilha?\n\nO histórico de " +
+      "diagnóstico é perdido e não tem como voltar. As sessões continuam.")) return;
+
+    chamar({ acao: "dev_limpar", token: credencial(), alvo: "logs" }).then(function (r) {
+      if (r && r.erro === "sessao") {
+        credencial(null);
+        fechar(dlgPainel);
+        pedirSenha();
+        return;
+      }
+      selecionado = null;
+      carregar();
+    }).catch(function () {
+      desenhar("Não foi possível limpar agora: o servidor não respondeu.");
+    });
+  }
+})(window);

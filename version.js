@@ -22,6 +22,30 @@
   /* Mais recente primeiro. Use apenas categorias com conteúdo real. */
   var CHANGELOG = [
     {
+      versao: "2.0.0",
+      codinome: "ALVORADA",
+      data: "21/08/2026",
+      mudancas: {
+        "Adicionado": [
+          "Aba Sobre na tela inicial, com a descrição do sistema, os dois módulos e a versão publicada.",
+          "Painel de manutenção com visão geral, logs, acessos e informações técnicas, protegido por senha conferida no servidor.",
+          "Registro técnico do que acontece no site — aberturas, saídas para o CRM e para a agenda, erros de JavaScript e falhas de comunicação — guardado na planilha para facilitar o diagnóstico."
+        ],
+        "Visual": [
+          "Portal redesenhado: cabeçalho com a marca e a data por extenso, cartões de acesso com mais informação, rodapé estruturado e entrada suave dos elementos.",
+          "Detalhe da lótus em marca-d'água ao fundo, sombras leves e transições mais calmas."
+        ],
+        "Técnico": [
+          "Duas abas novas na planilha, Logs e Sessoes, com limite de linhas e descarte automático depois de 90 dias.",
+          "A entrada do painel bloqueia por 15 minutos após cinco tentativas seguidas, e a credencial expira em 30 minutos.",
+          "Os registros guardam identificadores sorteados e só o que o navegador informa sem pedir permissão — sem localização, câmera ou microfone."
+        ],
+        "Performance": [
+          "O registro técnico envia em lotes, alguns segundos depois de a página abrir, para não atrasar o carregamento."
+        ]
+      }
+    },
+    {
       versao: "1.2.0",
       codinome: "POUSIO",
       data: "20/08/2026",

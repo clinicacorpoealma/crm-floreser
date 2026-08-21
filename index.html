@@ -19,14 +19,20 @@
     :root {
       --teal: #3B6E6A;
       --teal-light: #5A9490;
+      --teal-deep: #2E5754;
       --sage: #C9D3CA;
       --creme: #F5F0EB;
       --taupe: #A39384;
       --carvao: #2D2D2D;
       --branco: #FFFFFF;
       --linha: #E2DED7;
+      --alerta: #A8623F;
       --serif: 'Cormorant Garamond', Georgia, serif;
       --sans: 'Montserrat', Calibri, system-ui, sans-serif;
+      --mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Menlo, Consolas, monospace;
+      --raio: 14px;
+      --sombra: 0 1px 2px rgba(45, 45, 45, .04), 0 10px 28px rgba(59, 110, 106, .09);
+      --sombra-alta: 0 2px 4px rgba(45, 45, 45, .05), 0 18px 40px rgba(59, 110, 106, .16);
     }
 
     * {
@@ -40,12 +46,7 @@
     }
 
     body {
-      position: relative;
       min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 48px 24px 58px;
       background: var(--creme);
       color: var(--carvao);
       font-family: var(--sans);
@@ -54,52 +55,108 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    .portal {
-      width: 100%;
-      max-width: 620px;
-      text-align: center;
+    /* pétala de fundo, quase invisível — só dá profundidade ao creme */
+    body::before {
+      content: "";
+      position: fixed;
+      right: -180px;
+      bottom: -200px;
+      width: 620px;
+      height: 620px;
+      background: url("logo.png") no-repeat center / contain;
+      opacity: .04;
+      pointer-events: none;
+      z-index: 0;
     }
 
-    /* ---------- Marca ---------- */
+    .moldura {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 38px 32px 26px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---------- Cabeçalho ---------- */
+    .topo {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid var(--linha);
+    }
+
+    .marca {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      min-width: 0;
+    }
+
     .marca img {
-      display: block;
+      flex: 0 0 auto;
       width: auto;
-      height: 68px;
-      margin: 0 auto 22px;
+      height: 54px;
     }
 
     .marca h1 {
       font-family: var(--serif);
       font-weight: 600;
-      font-size: clamp(42px, 9vw, 58px);
+      font-size: clamp(30px, 5.2vw, 38px);
       line-height: 1.05;
       color: var(--teal);
       letter-spacing: .005em;
     }
 
     .marca .tagline {
-      margin-top: 14px;
+      margin-top: 5px;
       font-weight: 300;
-      font-size: 10.5px;
-      letter-spacing: .3em;
+      font-size: 9.5px;
+      letter-spacing: .28em;
       text-transform: uppercase;
       color: var(--taupe);
     }
 
-    .divisor {
-      width: 54px;
-      height: 1px;
-      background: var(--sage);
-      margin: 34px auto 0;
+    .topo-data {
+      margin-left: auto;
+      text-align: right;
+      font-weight: 300;
+      font-size: 10px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--teal);
+      white-space: nowrap;
     }
 
-    /* ---------- Acessos ---------- */
+    /* ---------- Miolo ---------- */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 40px 0;
+    }
+
+    .chamada {
+      font-weight: 400;
+      font-size: 10.5px;
+      letter-spacing: .24em;
+      text-transform: uppercase;
+      color: var(--taupe);
+      text-align: center;
+      margin-bottom: 22px;
+    }
+
     .acessos {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 22px;
-      max-width: 520px;
-      margin: 34px auto 0;
+      gap: 24px;
+      max-width: 560px;
+      width: 100%;
+      margin: 0 auto;
     }
 
     .quadro {
@@ -108,14 +165,27 @@
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      text-align: left;
       padding: 26px 24px;
-      border-radius: 14px;
+      border-radius: var(--raio);
       background: var(--teal);
       color: var(--branco);
       text-decoration: none;
-      box-shadow: 0 1px 2px rgba(45, 45, 45, .05), 0 10px 26px rgba(59, 110, 106, .10);
-      transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+      box-shadow: var(--sombra);
+      overflow: hidden;
+      transition: background .22s ease, transform .22s ease, box-shadow .22s ease;
+    }
+
+    /* brilho discreto no canto superior, some no hover */
+    .quadro::after {
+      content: "";
+      position: absolute;
+      top: -60px;
+      right: -60px;
+      width: 150px;
+      height: 150px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, .05);
+      transition: opacity .22s ease;
     }
 
     .quadro svg {
@@ -138,36 +208,45 @@
       margin-top: 7px;
     }
 
-    .quadro .entrar {
-      margin-top: 16px;
+    .quadro .meta {
+      margin-top: 12px;
+      padding-top: 11px;
+      border-top: 1px solid rgba(255, 255, 255, .16);
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
       font-weight: 500;
-      font-size: 10px;
-      letter-spacing: .22em;
+      font-size: 9.5px;
+      letter-spacing: .16em;
       text-transform: uppercase;
-      color: rgba(255, 255, 255, .68);
-      transition: color .2s ease;
+      color: rgba(255, 255, 255, .7);
+      transition: color .22s ease;
     }
 
-    .quadro .entrar i {
+    .quadro .meta i {
       font-style: normal;
-      display: inline-block;
-      margin-left: 5px;
-      transition: transform .2s ease;
+      margin-left: auto;
+      transition: transform .22s ease;
     }
 
     @media (hover: hover) {
       .quadro:hover {
         background: var(--teal-light);
-        transform: translateY(-3px);
-        box-shadow: 0 2px 4px rgba(45, 45, 45, .05), 0 16px 34px rgba(59, 110, 106, .16);
+        transform: translateY(-4px);
+        box-shadow: var(--sombra-alta);
       }
 
-      .quadro:hover .entrar {
+      .quadro:hover::after {
+        opacity: 0;
+      }
+
+      .quadro:hover .meta {
         color: var(--branco);
       }
 
-      .quadro:hover .entrar i {
-        transform: translateX(3px);
+      .quadro:hover .meta i {
+        transform: translateX(4px);
       }
     }
 
@@ -176,22 +255,65 @@
       outline-offset: 3px;
     }
 
-    /* ---------- Rodapé ---------- */
-    .rodape {
-      margin-top: 40px;
-      font-weight: 300;
-      font-size: 10px;
-      letter-spacing: .24em;
-      text-transform: uppercase;
-      color: var(--taupe);
+    .secundario {
+      margin-top: 26px;
+      text-align: center;
     }
 
-    /* ---------- Cantos: versão e histórico ---------- */
-    /* teal em vez de taupe: no tamanho pequeno, o taupe sobre o creme
-       não alcança o contraste mínimo de leitura */
+    .link-suave {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 16px;
+      border: 1px solid var(--linha);
+      border-radius: 30px;
+      background: transparent;
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: 10px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--teal);
+      cursor: pointer;
+      transition: background .18s ease, border-color .18s ease;
+    }
+
+    .link-suave:hover,
+    .link-suave:focus-visible {
+      background: rgba(201, 211, 202, .35);
+      border-color: var(--sage);
+      outline: none;
+    }
+
+    .link-suave:focus-visible {
+      outline: 2px solid var(--teal);
+      outline-offset: 2px;
+    }
+
+    /* ---------- Rodapé ---------- */
+    .rodape {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding-top: 18px;
+      border-top: 1px solid var(--linha);
+      font-weight: 400;
+      font-size: 10px;
+      letter-spacing: .18em;
+      color: var(--teal);
+      line-height: 1;
+    }
+
+    .rodape-centro {
+      flex: 1;
+      text-align: center;
+      font-weight: 300;
+      text-transform: uppercase;
+      color: var(--taupe);
+      letter-spacing: .22em;
+    }
+
     .canto {
-      position: absolute;
-      bottom: 20px;
       font-family: var(--sans);
       font-weight: 400;
       font-size: 10px;
@@ -200,18 +322,12 @@
       line-height: 1;
     }
 
-    .canto-versao {
-      right: 24px;
-      text-transform: none;
-    }
-
     .canto-historico {
-      left: 24px;
       display: flex;
       align-items: center;
       gap: 6px;
-      padding: 6px 8px;
-      margin: -6px -8px;
+      padding: 8px 10px;
+      margin: -8px -10px;
       border: none;
       border-radius: 6px;
       background: none;
@@ -236,29 +352,25 @@
     .canto-historico:focus-visible {
       outline: 2px solid var(--teal);
       outline-offset: 2px;
-      color: var(--teal);
     }
 
-    /* ---------- Histórico de versões ---------- */
-    .historico {
-      width: min(560px, calc(100% - 32px));
-      max-height: min(78vh, 680px);
-      /* o reset de margens da página zera o centralizador do <dialog> */
+    /* ---------- Janelas ---------- */
+    dialog {
       margin: auto;
       padding: 0;
       border: none;
-      border-radius: 14px;
+      border-radius: var(--raio);
       background: var(--creme);
       color: var(--carvao);
       box-shadow: 0 20px 60px rgba(30, 50, 48, .28);
       overflow: hidden;
     }
 
-    .historico::backdrop {
+    dialog::backdrop {
       background: rgba(30, 50, 48, .5);
     }
 
-    .historico-topo {
+    .janela-topo {
       display: flex;
       align-items: baseline;
       gap: 14px;
@@ -267,7 +379,7 @@
       background: var(--creme);
     }
 
-    .historico-topo h2 {
+    .janela-topo h2 {
       font-family: var(--serif);
       font-weight: 600;
       font-size: 27px;
@@ -275,7 +387,15 @@
       color: var(--teal);
     }
 
-    .historico-fechar {
+    .janela-topo .selo {
+      font-weight: 500;
+      font-size: 9px;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--taupe);
+    }
+
+    .fechar {
       margin-left: auto;
       padding: 6px 9px;
       border: none;
@@ -288,18 +408,26 @@
       transition: color .18s ease, background .18s ease;
     }
 
-    .historico-fechar:hover,
-    .historico-fechar:focus-visible {
-      color: var(--teal);
+    .fechar:hover,
+    .fechar:focus-visible {
       background: rgba(201, 211, 202, .4);
       outline: none;
     }
 
-    .historico-corpo {
-      max-height: calc(min(78vh, 680px) - 78px);
+    .janela-corpo {
       overflow-y: auto;
-      padding: 4px 26px 26px;
       overscroll-behavior: contain;
+      padding: 4px 26px 26px;
+    }
+
+    /* ---------- Histórico ---------- */
+    .historico {
+      width: min(560px, calc(100% - 32px));
+      max-height: min(78vh, 680px);
+    }
+
+    .historico .janela-corpo {
+      max-height: calc(min(78vh, 680px) - 78px);
     }
 
     .versao-bloco {
@@ -361,42 +489,505 @@
       background: var(--sage);
     }
 
-    @media (max-width: 560px) {
-      body {
-        padding: 44px 20px 56px;
+    /* ---------- Sobre ---------- */
+    .sobre {
+      width: min(600px, calc(100% - 32px));
+      max-height: min(82vh, 700px);
+    }
+
+    .sobre .janela-corpo {
+      max-height: calc(min(82vh, 700px) - 78px);
+    }
+
+    .sobre-intro {
+      padding: 20px 0 4px;
+      font-size: 14px;
+      line-height: 1.65;
+    }
+
+    .sobre-intro strong {
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 19px;
+      color: var(--teal);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .modulo {
+      display: flex;
+      gap: 14px;
+      padding: 18px 0;
+      border-top: 1px solid var(--linha);
+    }
+
+    .modulo svg {
+      flex: 0 0 auto;
+      color: var(--teal);
+      margin-top: 3px;
+    }
+
+    .modulo h3 {
+      font-family: var(--serif);
+      font-weight: 600;
+      font-size: 19px;
+      color: var(--teal);
+      line-height: 1.2;
+    }
+
+    .modulo p {
+      margin-top: 4px;
+      font-size: 13.5px;
+      line-height: 1.55;
+    }
+
+    .ficha {
+      margin-top: 18px;
+      padding: 16px 18px;
+      border: 1px solid var(--linha);
+      border-radius: 10px;
+      background: var(--branco);
+    }
+
+    .ficha h4 {
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--taupe);
+      margin-bottom: 10px;
+    }
+
+    .ficha dl {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 7px 16px;
+      font-size: 13px;
+    }
+
+    .ficha dt {
+      color: var(--taupe);
+    }
+
+    .ficha dd {
+      text-align: right;
+      color: var(--carvao);
+    }
+
+    .assinatura {
+      margin-top: 18px;
+      font-family: var(--serif);
+      font-style: italic;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--teal);
+      text-align: center;
+    }
+
+    /* ---------- Painel de manutenção ---------- */
+    .entrada-tecnica {
+      width: min(360px, calc(100% - 32px));
+    }
+
+    .entrada-tecnica .janela-corpo {
+      padding: 20px 26px 24px;
+    }
+
+    .entrada-tecnica p {
+      font-size: 12.5px;
+      color: var(--taupe);
+      line-height: 1.5;
+    }
+
+    .entrada-tecnica input {
+      width: 100%;
+      margin-top: 14px;
+      padding: 11px 13px;
+      border: 1px solid var(--linha);
+      border-radius: 8px;
+      background: var(--branco);
+      font-family: var(--sans);
+      font-size: 14px;
+      color: var(--carvao);
+    }
+
+    .entrada-tecnica input:focus {
+      outline: none;
+      border-color: var(--teal-light);
+    }
+
+    .entrada-tecnica .aviso {
+      min-height: 16px;
+      margin-top: 9px;
+      font-size: 12px;
+      color: var(--alerta);
+    }
+
+    .botao-cheio {
+      width: 100%;
+      margin-top: 8px;
+      padding: 11px;
+      border: none;
+      border-radius: 8px;
+      background: var(--teal);
+      color: var(--branco);
+      font-family: var(--sans);
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: .03em;
+      cursor: pointer;
+      transition: background .18s ease;
+    }
+
+    .botao-cheio:hover {
+      background: var(--teal-light);
+    }
+
+    .botao-cheio[disabled] {
+      opacity: .55;
+      cursor: default;
+    }
+
+    .painel {
+      width: min(1040px, calc(100% - 24px));
+      max-height: min(90vh, 860px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .painel .janela-topo {
+      padding-bottom: 0;
+      border-bottom: none;
+      flex-wrap: wrap;
+    }
+
+    .abas {
+      display: flex;
+      gap: 2px;
+      padding: 14px 26px 0;
+      border-bottom: 1px solid var(--linha);
+      overflow-x: auto;
+    }
+
+    .abas button {
+      padding: 10px 14px;
+      border: none;
+      border-bottom: 2px solid transparent;
+      background: none;
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: 10.5px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--taupe);
+      white-space: nowrap;
+      cursor: pointer;
+      transition: color .18s ease, border-color .18s ease;
+    }
+
+    .abas button:hover {
+      color: var(--teal-light);
+    }
+
+    .abas button.on {
+      color: var(--teal);
+      border-bottom-color: var(--teal);
+    }
+
+    .painel .janela-corpo {
+      flex: 1;
+      padding: 22px 26px 26px;
+    }
+
+    .grade {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 12px;
+    }
+
+    .cartao {
+      padding: 13px 15px;
+      border: 1px solid var(--linha);
+      border-radius: 10px;
+      background: var(--branco);
+    }
+
+    .cartao .rot {
+      font-weight: 600;
+      font-size: 9px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--taupe);
+    }
+
+    .cartao .val {
+      margin-top: 5px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--carvao);
+      word-break: break-word;
+    }
+
+    .cartao .val.destaque {
+      font-family: var(--serif);
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--teal);
+    }
+
+    .cartao .val.ausente {
+      color: var(--taupe);
+      font-style: italic;
+      font-family: var(--sans);
+      font-size: 12.5px;
+    }
+
+    .titulo-secao {
+      margin: 24px 0 10px;
+      font-weight: 600;
+      font-size: 10px;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--taupe);
+    }
+
+    .titulo-secao:first-child {
+      margin-top: 0;
+    }
+
+    .ferramentas {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .ferramentas input[type="search"],
+    .ferramentas select {
+      padding: 8px 11px;
+      border: 1px solid var(--linha);
+      border-radius: 8px;
+      background: var(--branco);
+      font-family: var(--sans);
+      font-size: 12.5px;
+      color: var(--carvao);
+    }
+
+    .ferramentas input[type="search"] {
+      flex: 1 1 170px;
+      min-width: 0;
+    }
+
+    .btn-fino {
+      padding: 8px 13px;
+      border: 1px solid var(--linha);
+      border-radius: 8px;
+      background: var(--branco);
+      font-family: var(--sans);
+      font-weight: 500;
+      font-size: 10px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--teal);
+      cursor: pointer;
+      transition: background .18s ease, border-color .18s ease;
+    }
+
+    .btn-fino:hover {
+      background: rgba(201, 211, 202, .35);
+      border-color: var(--sage);
+    }
+
+    .btn-fino.perigo {
+      color: var(--alerta);
+    }
+
+    .tabela {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .tabela th {
+      position: sticky;
+      top: 0;
+      background: var(--creme);
+      padding: 8px 10px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 9px;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--taupe);
+      border-bottom: 1px solid var(--linha);
+      white-space: nowrap;
+    }
+
+    .tabela th.ordenavel {
+      cursor: pointer;
+    }
+
+    .tabela td {
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--linha);
+      vertical-align: top;
+    }
+
+    .tabela tbody tr {
+      cursor: pointer;
+      transition: background .15s ease;
+    }
+
+    .tabela tbody tr:hover {
+      background: rgba(201, 211, 202, .22);
+    }
+
+    .tabela .quando,
+    .tabela .evento {
+      font-family: var(--mono);
+      font-size: 11.5px;
+      white-space: nowrap;
+    }
+
+    .nivel {
+      display: inline-block;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-family: var(--sans);
+      font-weight: 600;
+      font-size: 8.5px;
+      letter-spacing: .12em;
+      white-space: nowrap;
+    }
+
+    .nivel.INFO {
+      background: #E7EEEB;
+      color: var(--teal-deep);
+    }
+
+    .nivel.WARNING {
+      background: #F4EBDD;
+      color: #8A6127;
+    }
+
+    .nivel.ERROR {
+      background: #F5E5DE;
+      color: #93482A;
+    }
+
+    .nivel.SECURITY {
+      background: #E5E2ED;
+      color: #4C4470;
+    }
+
+    .detalhe {
+      margin-top: 14px;
+      padding: 14px 16px;
+      border: 1px solid var(--linha);
+      border-left: 3px solid var(--teal);
+      border-radius: 8px;
+      background: var(--branco);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .vazio {
+      padding: 34px 16px;
+      text-align: center;
+      color: var(--taupe);
+      font-size: 13px;
+    }
+
+    .nota-privacidade {
+      margin-top: 18px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: rgba(201, 211, 202, .3);
+      font-size: 11.5px;
+      line-height: 1.55;
+      color: var(--teal-deep);
+    }
+
+    .sessao-bloco {
+      padding: 16px 0;
+      border-bottom: 1px solid var(--linha);
+    }
+
+    .sessao-bloco:last-child {
+      border-bottom: none;
+    }
+
+    .sessao-bloco h4 {
+      font-family: var(--mono);
+      font-size: 12.5px;
+      color: var(--teal);
+      margin-bottom: 4px;
+    }
+
+    .sessao-bloco .resumo {
+      font-size: 11.5px;
+      color: var(--taupe);
+      margin-bottom: 10px;
+    }
+
+    /* ---------- Entrada da página ---------- */
+    @keyframes surgir {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+    }
+
+    .topo,
+    .chamada,
+    .acessos,
+    .secundario,
+    .rodape {
+      animation: surgir .5s ease both;
+    }
+
+    .chamada {
+      animation-delay: .06s;
+    }
+
+    .acessos {
+      animation-delay: .1s;
+    }
+
+    .secundario {
+      animation-delay: .16s;
+    }
+
+    .rodape {
+      animation-delay: .22s;
+    }
+
+    /* ---------- Telas pequenas ---------- */
+    @media (max-width: 720px) {
+      .moldura {
+        padding: 24px 20px 20px;
       }
 
-      .canto {
-        bottom: 16px;
-        font-size: 9.5px;
-        letter-spacing: .14em;
+      .marca img {
+        height: 44px;
       }
 
-      .canto-versao {
-        right: 20px;
+      .topo-data {
+        display: none;
       }
 
-      .canto-historico {
-        left: 20px;
-        padding: 12px 12px;
-        margin: -12px -12px;
-      }
-
-      .historico-topo {
-        padding: 20px 20px 14px;
-      }
-
-      .historico-topo h2 {
-        font-size: 24px;
-      }
-
-      .historico-corpo {
-        padding: 4px 20px 22px;
+      main {
+        padding: 30px 0;
       }
 
       .acessos {
         gap: 14px;
-        margin-top: 30px;
+        max-width: none;
       }
 
       .quadro {
@@ -412,14 +1003,69 @@
         display: none;
       }
 
-      .quadro .entrar {
+      .quadro .meta {
         margin-top: 10px;
-        font-size: 9px;
+        padding-top: 9px;
+        font-size: 8.5px;
+      }
+
+      .rodape {
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: space-between;
+      }
+
+      .rodape-centro {
+        order: 3;
+        flex: 1 0 100%;
+        text-align: center;
+      }
+
+      .janela-topo {
+        padding: 20px 20px 14px;
+      }
+
+      .janela-topo h2 {
+        font-size: 23px;
+      }
+
+      .janela-corpo,
+      .painel .janela-corpo {
+        padding: 16px 20px 22px;
+      }
+
+      .abas {
+        padding: 12px 20px 0;
+      }
+
+      .tabela thead {
+        display: none;
+      }
+
+      .tabela,
+      .tabela tbody,
+      .tabela tr,
+      .tabela td {
+        display: block;
+        width: 100%;
+      }
+
+      .tabela tr {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--linha);
+      }
+
+      .tabela td {
+        border: none;
+        padding: 2px 0;
       }
     }
 
     @media (prefers-reduced-motion: reduce) {
-      * {
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
         transition: none !important;
       }
     }
@@ -428,130 +1074,230 @@
 
 <body>
 
-  <main class="portal">
+  <div class="moldura">
 
-    <div class="marca">
-      <img src="logo.png" width="366" height="380" alt="Símbolo FloreSer — flor de lótus">
+    <header class="topo">
+      <div class="marca">
+        <img src="logo.png" width="366" height="380" alt="Símbolo FloreSer — flor de lótus">
+        <div>
+          <h1 id="marca-titulo">Corp<span data-p="1">o</span> e A<span data-p="2">l</span>ma</h1>
+          <p class="tagline">Rejuvenescimento e Autoestima</p>
+        </div>
+      </div>
+      <div class="topo-data" id="topo-data"></div>
+    </header>
 
-      <h1>Corpo e Alma</h1>
-      <p class="tagline">Rejuvenescimento e Autoestima</p>
-      <div class="divisor"></div>
-    </div>
+    <main>
+      <p class="chamada">Sistema interno &middot; escolha por onde começar</p>
 
-    <nav class="acessos">
+      <nav class="acessos">
+        <a class="quadro" href="crm.html" data-modulo="CRM" aria-label="Abrir o CRM">
+          <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.1"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="6" width="24" height="20" rx="3" />
+            <path d="M4 11.5h24" />
+            <circle cx="12.5" cy="17.2" r="2.5" />
+            <path d="M8.2 22.8c.6-2.3 2.2-3.4 4.3-3.4s3.7 1.1 4.3 3.4" />
+            <path d="M20.5 16.8h4M20.5 20.8h4" />
+          </svg>
+          <span class="nome">CRM</span>
+          <span class="desc">Leads, funil comercial e follow-ups</span>
+          <span class="meta">Etapas &middot; Cadências<i>&rsaquo;</i></span>
+        </a>
 
-      <a class="quadro" href="crm.html" aria-label="Abrir o CRM — leads e follow-ups">
-        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.1"
-          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="4" y="6" width="24" height="20" rx="3" />
-          <path d="M4 11.5h24" />
-          <circle cx="12.5" cy="17.2" r="2.5" />
-          <path d="M8.2 22.8c.6-2.3 2.2-3.4 4.3-3.4s3.7 1.1 4.3 3.4" />
-          <path d="M20.5 16.8h4M20.5 20.8h4" />
+        <a class="quadro" href="agenda.html" data-modulo="Agenda" aria-label="Abrir a Agenda">
+          <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.1"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="4" y="7" width="24" height="21" rx="3" />
+            <path d="M4 13.5h24" />
+            <path d="M10.5 4.5v5M21.5 4.5v5" />
+            <path d="M12 21.2l2.6 2.6 5.4-5.8" />
+          </svg>
+          <span class="nome">Agendamentos</span>
+          <span class="desc">Retornos, ciclos e máquinas temporárias</span>
+          <span class="meta">Pacientes &middot; Prazos<i>&rsaquo;</i></span>
+        </a>
+      </nav>
+
+      <div class="secundario">
+        <button class="link-suave" id="abrir-sobre" type="button" aria-haspopup="dialog">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+            stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" />
+            <path d="M12 11v5.5M12 7.6v.6" />
+          </svg>
+          Sobre o sistema
+        </button>
+      </div>
+    </main>
+
+    <footer class="rodape">
+      <button class="canto canto-historico" id="abrir-historico" type="button" aria-haspopup="dialog">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
+          stroke-linecap="round" aria-hidden="true">
+          <path d="M12 7.5v5l3 1.8" />
+          <path d="M3.6 12a8.4 8.4 0 1 0 2.2-5.7" />
+          <path d="M3.2 4.6v3.4h3.4" />
         </svg>
-        <span class="nome">CRM</span>
-        <span class="desc">Leads, categorias e follow-ups</span>
-        <span class="entrar">Acessar<i>&rsaquo;</i></span>
-      </a>
+        Histórico
+      </button>
+      <span class="rodape-centro">Método FloreSer &middot; Uso interno</span>
+      <span class="canto" id="versao-atual"></span>
+    </footer>
 
-      <a class="quadro" href="agenda.html" aria-label="Abrir a Agenda — agendamento das pacientes">
-        <svg width="30" height="30" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.1"
-          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="4" y="7" width="24" height="21" rx="3" />
-          <path d="M4 13.5h24" />
-          <path d="M10.5 4.5v5M21.5 4.5v5" />
-          <path d="M12 21.2l2.6 2.6 5.4-5.8" />
-        </svg>
-        <span class="nome">Agendamentos</span>
-        <span class="desc">Retornos e acompanhamento das pacientes</span>
-        <span class="entrar">Acessar<i>&rsaquo;</i></span>
-      </a>
-
-    </nav>
-
-    <p class="rodape">Método FloreSer &middot; Uso interno</p>
-
-  </main>
-
-  <button class="canto canto-historico" id="abrir-historico" type="button" aria-haspopup="dialog">
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"
-      stroke-linecap="round" aria-hidden="true">
-      <path d="M12 7.5v5l3 1.8" />
-      <path d="M3.6 12a8.4 8.4 0 1 0 2.2-5.7" />
-      <path d="M3.2 4.6v3.4h3.4" />
-    </svg>
-    Histórico
-  </button>
-
-  <span class="canto canto-versao" id="versao-atual"></span>
+  </div>
 
   <dialog class="historico" id="historico" aria-labelledby="historico-titulo">
-    <div class="historico-topo">
+    <div class="janela-topo">
       <h2 id="historico-titulo">Histórico de versões</h2>
-      <button class="historico-fechar" id="fechar-historico" type="button" aria-label="Fechar histórico">&#10005;</button>
+      <button class="fechar" data-fecha="historico" type="button" aria-label="Fechar histórico">&#10005;</button>
     </div>
-    <div class="historico-corpo" id="historico-corpo" tabindex="0"></div>
+    <div class="janela-corpo" id="historico-corpo" tabindex="0"></div>
+  </dialog>
+
+  <dialog class="sobre" id="sobre" aria-labelledby="sobre-titulo">
+    <div class="janela-topo">
+      <h2 id="sobre-titulo">Sobre o sistema</h2>
+      <button class="fechar" data-fecha="sobre" type="button" aria-label="Fechar">&#10005;</button>
+    </div>
+    <div class="janela-corpo" id="sobre-corpo" tabindex="0"></div>
   </dialog>
 
   <script src="version.js"></script>
+  <script src="logs.js"></script>
   <script>
     (function () {
-      var dados = window.FLORESER;
-      if (!dados) return;
+      "use strict";
 
-      var dialogo = document.getElementById('historico');
-      var corpo = document.getElementById('historico-corpo');
-
-      document.getElementById('versao-atual').textContent = dados.rotulo;
+      var dados = window.FLORESER || { changelog: [], categorias: [], rotulo: "" };
+      var registrar = (window.FloreSerLogs && window.FloreSerLogs.registrar) || function () { };
 
       function esc(t) {
-        return String(t).replace(/[&<>"]/g, function (c) {
-          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+        return String(t === undefined || t === null ? "" : t).replace(/[&<>"]/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
         });
       }
 
-      /* O histórico é montado a partir dos dados: versões novas entram
-         em version.js, sem mexer nesta tela. */
-      corpo.innerHTML = dados.changelog.map(function (v) {
-        var secoes = dados.categorias
+      function abrir(dialogo) {
+        if (typeof dialogo.showModal === "function") dialogo.showModal();
+        else dialogo.setAttribute("open", "");
+        document.body.style.overflow = "hidden";
+      }
+
+      function fechar(dialogo) {
+        if (typeof dialogo.close === "function" && dialogo.open) dialogo.close();
+        else dialogo.removeAttribute("open");
+        document.body.style.overflow = "";
+      }
+
+      document.addEventListener("click", function (e) {
+        var alvo = e.target.closest ? e.target.closest("[data-fecha]") : null;
+        if (alvo) fechar(document.getElementById(alvo.getAttribute("data-fecha")));
+      });
+
+      document.addEventListener("keydown", function (e) {
+        if (e.key !== "Escape") return;
+        var abertos = document.querySelectorAll("dialog[open]");
+        if (abertos.length && typeof abertos[0].showModal !== "function") fechar(abertos[0]);
+      });
+
+      /* ---------------- data do cabeçalho ---------------- */
+
+      (function () {
+        var el = document.getElementById("topo-data");
+        if (!el) return;
+        try {
+          var d = new Date();
+          var texto = d.toLocaleDateString("pt-BR", {
+            weekday: "long", day: "numeric", month: "long", year: "numeric",
+          });
+          el.textContent = texto;
+        } catch (erro) {
+          el.textContent = "";
+        }
+      })();
+
+      /* ---------------- versão e histórico ---------------- */
+
+      var elVersao = document.getElementById("versao-atual");
+      elVersao.textContent = dados.rotulo;
+
+      var dlgHistorico = document.getElementById("historico");
+      document.getElementById("historico-corpo").innerHTML = (dados.changelog || []).map(function (v) {
+        var secoes = (dados.categorias || [])
           .filter(function (cat) { return v.mudancas[cat] && v.mudancas[cat].length; })
           .map(function (cat) {
-            return '<h4>' + esc(cat) + '</h4><ul>' +
-              v.mudancas[cat].map(function (item) { return '<li>' + esc(item) + '</li>'; }).join('') +
-              '</ul>';
-          }).join('');
-        return '<article class="versao-bloco">' +
-          '<h3>v' + esc(v.versao) + ' &mdash; ' + esc(v.codinome) + '</h3>' +
-          '<p class="data">' + esc(v.data) + '</p>' + secoes + '</article>';
-      }).join('');
+            return "<h4>" + esc(cat) + "</h4><ul>" +
+              v.mudancas[cat].map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") +
+              "</ul>";
+          }).join("");
+        return '<article class="versao-bloco"><h3>v' + esc(v.versao) + " &mdash; " + esc(v.codinome) +
+          '</h3><p class="data">' + esc(v.data) + "</p>" + secoes + "</article>";
+      }).join("");
 
-      var nativo = typeof dialogo.showModal === 'function';
+      document.getElementById("abrir-historico").addEventListener("click", function () {
+        document.getElementById("historico-corpo").scrollTop = 0;
+        abrir(dlgHistorico);
+        registrar("HISTORICO_ABERTO", { mensagem: "Histórico de versões consultado" });
+      });
 
-      function abrir() {
-        if (nativo) dialogo.showModal(); else dialogo.setAttribute('open', '');
-        document.body.style.overflow = 'hidden';
-        corpo.scrollTop = 0;
-      }
+      /* ---------------- sobre ---------------- */
 
-      function fechar() {
-        if (nativo) dialogo.close(); else dialogo.removeAttribute('open');
-        document.body.style.overflow = '';
-      }
+      var dlgSobre = document.getElementById("sobre");
+      var atual = dados.atual || {};
 
-      document.getElementById('abrir-historico').addEventListener('click', abrir);
-      document.getElementById('fechar-historico').addEventListener('click', fechar);
-      dialogo.addEventListener('close', function () { document.body.style.overflow = ''; });
+      document.getElementById("sobre-corpo").innerHTML =
+        '<div class="sobre-intro"><strong>FloreSer &mdash; Corpo e Alma</strong>' +
+        "Sistema interno desenvolvido para organizar e centralizar os processos da Clínica " +
+        "Corpo e Alma, do primeiro contato com a cliente até o acompanhamento dos retornos.</div>" +
 
-      /* clicar fora do cartão fecha */
-      dialogo.addEventListener('click', function (e) { if (e.target === dialogo) fechar(); });
+        '<div class="modulo">' +
+        '<svg width="20" height="20" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="4" y="6" width="24" height="20" rx="3"/><path d="M4 11.5h24"/>' +
+        '<circle cx="12.5" cy="17.2" r="2.5"/><path d="M8.2 22.8c.6-2.3 2.2-3.4 4.3-3.4s3.7 1.1 4.3 3.4"/>' +
+        '<path d="M20.5 16.8h4M20.5 20.8h4"/></svg>' +
+        "<div><h3>CRM</h3><p>Gerenciamento de leads, funil comercial, cadências de contato, " +
+        "follow-ups e acompanhamento das conversões.</p></div></div>" +
 
-      /* ESC nos navegadores sem <dialog> nativo */
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape' && !nativo && dialogo.hasAttribute('open')) fechar();
+        '<div class="modulo">' +
+        '<svg width="20" height="20" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+        '<rect x="4" y="7" width="24" height="21" rx="3"/><path d="M4 13.5h24"/>' +
+        '<path d="M10.5 4.5v5M21.5 4.5v5"/><path d="M12 21.2l2.6 2.6 5.4-5.8"/></svg>' +
+        "<div><h3>Agenda</h3><p>Gerenciamento das pacientes, ciclos por área, condições, retornos, " +
+        "máquinas temporárias e acompanhamento dos atendimentos.</p></div></div>" +
+
+        '<div class="ficha"><h4>Sistema</h4><dl>' +
+        "<dt>Versão</dt><dd>v" + esc(atual.versao) + "</dd>" +
+        "<dt>Codinome</dt><dd>" + esc(atual.codinome) + "</dd>" +
+        "<dt>Publicada em</dt><dd>" + esc(atual.data) + "</dd>" +
+        "<dt>Módulos</dt><dd>CRM &middot; Agenda</dd>" +
+        "</dl></div>" +
+
+        '<p class="assinatura">Tecnologia pensada para simplificar o cuidado, a organização e o ' +
+        "crescimento da Corpo e Alma.</p>";
+
+      document.getElementById("abrir-sobre").addEventListener("click", function () {
+        abrir(dlgSobre);
+        registrar("SOBRE_ABERTO", { mensagem: "Aba Sobre consultada" });
+      });
+
+      /* ---------------- saída para os módulos ---------------- */
+
+      Array.prototype.forEach.call(document.querySelectorAll(".quadro"), function (a) {
+        a.addEventListener("click", function () {
+          var modulo = a.getAttribute("data-modulo");
+          registrar(modulo === "CRM" ? "CRM_ACESSO" : "AGENDA_ACESSO", {
+            mensagem: "Saiu do portal para " + modulo,
+          });
+          if (window.FloreSerLogs) window.FloreSerLogs.enviar();
+        });
       });
     })();
   </script>
 
+  <script src="painel.js" defer></script>
 </body>
 
 </html>

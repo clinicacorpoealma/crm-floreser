@@ -414,25 +414,130 @@ footer{border-top:1px solid var(--linha);padding:26px 0;background:var(--branco)
 }
 
 /* ---------- PORTÃO DE ENTRADA ---------- */
-#portao{position:fixed;inset:0;z-index:500;background:var(--teal);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:24px}
-#portao .cartao{background:var(--creme);border-radius:14px;padding:34px 30px;
-  width:100%;max-width:380px;text-align:center;box-shadow:0 18px 44px rgba(30,50,48,.22)}
-#portao img{display:block;height:58px;width:auto;margin:0 auto 18px}
-#portao h2{font-size:29px;font-weight:600;color:var(--teal);line-height:1.15}
-#portao .tag{font-size:10px;font-weight:300;letter-spacing:.26em;text-transform:uppercase;
-  color:var(--taupe);margin-top:7px}
-#portao input{width:100%;margin-top:24px;padding:12px 14px;background:var(--branco);
-  border:1px solid var(--linha);border-radius:8px;font-size:15px;text-align:center;letter-spacing:.06em}
-#portao input:focus{outline:none;border-color:var(--teal-light)}
-#portao button{width:100%;margin-top:12px;padding:12px;border-radius:8px;background:var(--teal);
-  color:#fff;font-size:14px;font-weight:600;letter-spacing:.03em;transition:background .18s}
-#portao button:hover{background:var(--teal-light)}
-#portao button[disabled]{opacity:.55;cursor:default}
-#portao .erro{min-height:17px;margin-top:11px;font-size:12.5px;color:var(--alerta)}
-#portao .volta{font-size:10px;font-weight:300;letter-spacing:.22em;text-transform:uppercase;
-  color:rgba(255,255,255,.72);text-decoration:none}
-#portao .volta:hover{color:#fff}
+#portao{position:fixed;inset:0;z-index:500;background:var(--teal-deep);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;padding:28px 20px;overflow:hidden}
+#portao::before{content:"";position:absolute;right:-140px;bottom:-170px;width:520px;height:520px;
+  background:url("logo.png") no-repeat center/contain;opacity:.055;
+  filter:brightness(0) invert(1);pointer-events:none}
+
+#portao .cartao{position:relative;width:100%;max-width:400px;padding:42px 38px 32px;
+  background:var(--creme);border-radius:16px;text-align:center;
+  box-shadow:0 1px 2px rgba(20,40,38,.10), 0 24px 60px rgba(20,40,38,.30);
+  animation:portao-surge .5s cubic-bezier(.2,.8,.2,1) both}
+@keyframes portao-surge{from{opacity:0;transform:translateY(12px)}}
+
+#portao img{display:block;height:56px;width:auto;margin:0 auto 20px}
+#portao h2{font-family:var(--serif);font-size:30px;font-weight:600;color:var(--teal);line-height:1.1}
+#portao .tag{margin-top:7px;font-size:9.5px;font-weight:300;letter-spacing:.26em;
+  text-transform:uppercase;color:var(--taupe)}
+#portao .risco{width:38px;height:1px;background:var(--sage);margin:22px auto 24px}
+
+#portao .campo{position:relative;display:flex;align-items:center}
+#portao .so-leitor{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+#portao .campo .cadeado{position:absolute;left:14px;color:var(--taupe);pointer-events:none}
+#portao input{width:100%;padding:14px 46px 14px 40px;background:var(--branco);
+  border:1px solid var(--linha);border-radius:10px;font-family:var(--sans);font-size:15px;
+  color:var(--carvao);letter-spacing:.02em;text-align:left;
+  transition:border-color .18s ease, box-shadow .18s ease}
+#portao input::placeholder{color:#B9B0A6;letter-spacing:.01em}
+#portao input:focus{outline:none;border-color:var(--teal-light);
+  box-shadow:0 0 0 3px rgba(90,148,144,.16)}
+
+#portao .olho{position:absolute;right:6px;width:34px;height:34px;display:flex;
+  align-items:center;justify-content:center;border:none;border-radius:8px;background:none;
+  color:var(--taupe);cursor:pointer;transition:color .18s ease, background .18s ease}
+#portao .olho:hover{color:var(--teal);background:rgba(201,211,202,.45)}
+#portao .olho:focus-visible{outline:2px solid var(--teal-light);outline-offset:1px}
+#portao .olho .fechado{display:none}
+#portao .olho.aberto .destapado{display:none}
+#portao .olho.aberto .fechado{display:block}
+
+#portao .erro{display:flex;align-items:flex-start;gap:8px;margin-top:12px;padding:10px 12px;
+  border-radius:8px;background:var(--alerta-bg);color:var(--alerta);
+  font-size:12.5px;line-height:1.45;text-align:left;
+  animation:portao-surge .26s ease both}
+#portao .erro:empty{display:none}
+#portao .erro svg{flex:0 0 auto;margin-top:1px}
+
+#portao button#portao-btn{width:100%;margin-top:16px;padding:13px;border:none;border-radius:10px;
+  background:var(--teal);color:#fff;font-family:var(--sans);font-size:13.5px;font-weight:600;
+  letter-spacing:.06em;display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:background .18s ease, box-shadow .2s ease, transform .15s ease}
+#portao button#portao-btn:hover{background:var(--teal-light);box-shadow:0 8px 20px rgba(59,110,106,.28)}
+#portao button#portao-btn:active{transform:translateY(1px)}
+#portao button#portao-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#portao button#portao-btn[disabled]{opacity:.72;cursor:default;box-shadow:none;background:var(--teal)}
+#portao button#portao-btn.carregando::after{content:"";width:14px;height:14px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#fff;
+  animation:portao-gira .7s linear infinite}
+@keyframes portao-gira{to{transform:rotate(360deg)}}
+
+#portao .volta{font-size:9.5px;font-weight:300;letter-spacing:.22em;text-transform:uppercase;
+  color:rgba(255,255,255,.72);text-decoration:none;padding:8px 12px;border-radius:8px;
+  transition:color .18s ease, background .18s ease}
+#portao .volta:hover{color:#fff;background:rgba(255,255,255,.08)}
+#portao .volta:focus-visible{outline:2px solid rgba(255,255,255,.55);outline-offset:2px}
+
+@media(max-width:480px){
+  #portao .cartao{padding:34px 24px 28px;border-radius:14px}
+  #portao img{height:48px;margin-bottom:16px}
+  #portao h2{font-size:26px}
+  #portao .risco{margin:18px auto 20px}
+}
+@media (prefers-reduced-motion: reduce){
+  #portao .cartao,#portao .erro{animation:none}
+  #portao button#portao-btn.carregando::after{animation:none}
+}
+/* ---------- ACABAMENTO ----------
+   Cantos, sombras e transições no mesmo tom do portal. Fica por último para
+   valer sobre as regras de cima sem precisar reescrevê-las. */
+:root{
+  --raio-g:12px; --raio-m:10px; --raio-p:8px;
+  --sombra-suave:0 1px 2px rgba(45,45,45,.04), 0 8px 22px rgba(59,110,106,.07);
+  --sombra-alta:0 2px 4px rgba(45,45,45,.05), 0 14px 32px rgba(59,110,106,.13);
+}
+
+.card,.day,.stat,.form,.tbl-wrap,.note,.model>*{border-radius:var(--raio-m)}
+.modal{border-radius:var(--raio-g)}
+.card-obs,.badge,.btn{border-radius:var(--raio-p)}
+.badge{border-radius:20px}
+.btn{border-radius:22px}
+
+.card{
+  box-shadow:var(--sombra-suave);
+  transition:border-color .2s ease, box-shadow .24s ease, transform .24s ease;
+}
+.card:hover{box-shadow:var(--sombra-alta)}
+.stat,.tbl-wrap,.form{box-shadow:var(--sombra-suave)}
+
+@media (hover:hover){
+  .card:hover{transform:translateY(-2px)}
+  .btn.p:hover{box-shadow:0 6px 16px rgba(59,110,106,.22)}
+  .nav button:hover{background:rgba(201,211,202,.28)}
+  .day:not(.today):hover{border-color:var(--sage)}
+}
+
+.nav button{border-radius:8px 8px 0 0;transition:color .18s ease, border-color .18s ease, background .18s ease}
+.btn{transition:background .18s ease, border-color .18s ease, color .18s ease, box-shadow .2s ease}
+.day{transition:border-color .2s ease}
+
+/* respiro um pouco maior entre título e conteúdo */
+.page-head{margin-bottom:34px}
+.page-head h2{letter-spacing:.005em}
+
+/* a barra do topo ganha um fio de luz na base, em vez de corte seco */
+.topbar{box-shadow:inset 0 -1px 0 rgba(255,255,255,.12)}
+
+#toast{border-radius:24px}
+
+/* entrada suave, uma vez só, sem animação em quem prefere menos movimento */
+@keyframes surgir-agenda{from{opacity:0;transform:translateY(8px)}}
+main .page{animation:surgir-agenda .42s ease both}
+
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation:none !important;transition:none !important}
+}
 </style>
 </head>
 <body>
@@ -442,9 +547,33 @@ footer{border-top:1px solid var(--linha);padding:26px 0;background:var(--branco)
     <img src="logo.png" width="366" height="380" alt="Símbolo FloreSer">
     <h2>Agenda FloreSer</h2>
     <p class="tag">Clínica Corpo e Alma</p>
-    <input type="password" id="portao-senha" placeholder="Senha de acesso"
-           autocomplete="current-password" enterkeyhint="go">
-    <div class="erro" id="portao-erro"></div>
+    <div class="risco"></div>
+
+    <div class="campo">
+      <label class="so-leitor" for="portao-senha">Senha de acesso</label>
+      <svg class="cadeado" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+        <rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/>
+        <path d="M8.2 10.5V7.8a3.8 3.8 0 0 1 7.6 0v2.7"/>
+      </svg>
+      <input type="password" id="portao-senha" placeholder="Senha de acesso"
+             autocomplete="current-password" enterkeyhint="go">
+      <button type="button" class="olho" id="portao-olho" aria-label="Mostrar senha" aria-pressed="false">
+        <svg class="destapado" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M2.5 12S6.1 5.5 12 5.5 21.5 12 21.5 12 17.9 18.5 12 18.5 2.5 12 2.5 12Z"/>
+          <circle cx="12" cy="12" r="2.8"/>
+        </svg>
+        <svg class="fechado" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M2.5 12S6.1 5.5 12 5.5c1.6 0 3 .3 4.3.9M21.5 12s-3.6 6.5-9.5 6.5c-1.7 0-3.1-.3-4.4-.9"/>
+          <path d="M9.7 9.8a3 3 0 0 0 4.2 4.2"/>
+          <path d="M4.2 19.8 19.8 4.2"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="erro" id="portao-erro" role="alert"></div>
     <button id="portao-btn">Entrar</button>
   </div>
   <a class="volta" href="index.html">&lsaquo; Início</a>
@@ -2858,9 +2987,18 @@ function guardarSenha(x){ try{ sessionStorage.setItem(CHAVE_SENHA,x); }catch(e){
 function senhaGuardada(){ try{ return sessionStorage.getItem(CHAVE_SENHA)||''; }catch(e){ return ''; } }
 function esquecerSenha(){ try{ sessionStorage.removeItem(CHAVE_SENHA); }catch(e){} }
 
+const AVISO='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" '+
+  'stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M12 3.8 21 19.5H3L12 3.8Z"/>'+
+  '<path d="M12 10v4M12 16.6v.4"/></svg>';
+
+function avisar(texto){
+  elErro.innerHTML = texto ? AVISO+'<span>'+texto+'</span>' : '';
+}
+
 async function entrar(senha){
   if(!senha){ elSenha.focus(); return; }
-  elBtn.disabled=true; elBtn.textContent='Conectando…'; elErro.textContent='';
+  elBtn.disabled=true; elBtn.classList.add('carregando');
+  elBtn.textContent='Conectando…'; avisar('');
   SESSAO.senha=senha;
   try{
     await carregar();
@@ -2868,10 +3006,11 @@ async function entrar(senha){
     abrirApp();
   }catch(e){
     const erro=String(e&&e.message||e);
-    if(erro==='senha'){ esquecerSenha(); elErro.textContent='Senha incorreta.'; }
-    else if(erro==='ocupado'){ elErro.textContent='A planilha está ocupada. Tente de novo em instantes.'; }
-    else { elErro.textContent='Não foi possível falar com a planilha. Confira sua internet.'; }
-    elSenha.value=''; elBtn.disabled=false; elBtn.textContent='Entrar'; elSenha.focus();
+    if(erro==='senha'){ esquecerSenha(); avisar('Senha incorreta. Confira e tente de novo.'); }
+    else if(erro==='ocupado'){ avisar('A planilha está ocupada. Tente de novo em instantes.'); }
+    else { avisar('Não foi possível falar com a planilha. Confira sua internet.'); }
+    elSenha.value=''; elBtn.disabled=false; elBtn.classList.remove('carregando');
+    elBtn.textContent='Entrar'; elSenha.focus();
   }
 }
 
@@ -2891,6 +3030,16 @@ function abrirApp(){
 
 elBtn.addEventListener('click',()=>entrar(elSenha.value.trim()));
 elSenha.addEventListener('keydown',e=>{ if(e.key==='Enter') entrar(elSenha.value.trim()); });
+
+const elOlho=document.getElementById('portao-olho');
+elOlho.addEventListener('click',()=>{
+  const estaVisivel = elSenha.type==='text';
+  elSenha.type = estaVisivel ? 'password' : 'text';
+  elOlho.classList.toggle('aberto', !estaVisivel);
+  elOlho.setAttribute('aria-pressed', String(!estaVisivel));
+  elOlho.setAttribute('aria-label', estaVisivel ? 'Mostrar senha' : 'Ocultar senha');
+  elSenha.focus();
+});
 
 const guardada=senhaGuardada();
 if(guardada) entrar(guardada); else elSenha.focus();

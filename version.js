@@ -22,6 +22,43 @@
   /* Mais recente primeiro. Use apenas categorias com conteúdo real. */
   var CHANGELOG = [
     {
+      versao: "2.2.0",
+      codinome: "LIMIAR",
+      data: "21/08/2026",
+      mudancas: {
+        "Visual": [
+          "As telas de senha do CRM e da agenda foram refeitas com o mesmo desenho: fundo em teal profundo com a lótus ao fundo, cartão creme centrado, marca acima do nome do módulo e um fio sage separando o título do campo.",
+          "O campo de senha ganhou ícone de cadeado, realce suave ao ser focado e cantos mais macios; o botão Entrar ganhou estados de repouso, hover e envio."
+        ],
+        "Adicionado": [
+          "Botão discreto para mostrar e ocultar a senha, com rótulo lido por leitores de tela.",
+          "Aviso de senha incorreta integrado ao cartão, com ícone e fundo suave, no lugar de uma linha solta de texto."
+        ],
+        "Melhorado": [
+          "Enquanto o sistema confere a senha, o botão mostra um giro discreto e o campo fica bloqueado, deixando claro que algo está acontecendo.",
+          "As duas telas ficaram melhores de usar no celular e por teclado, e a animação de entrada respeita quem prefere menos movimento."
+        ]
+      }
+    },
+    {
+      versao: "2.1.0",
+      codinome: "SERENO",
+      data: "21/08/2026",
+      mudancas: {
+        "Corrigido": [
+          "O painel de manutenção continuava desenhado por cima da tela inicial depois de fechado.",
+          "O site às vezes abria numa versão antiga guardada pelo navegador, mesmo depois de a atualização já estar publicada."
+        ],
+        "Visual": [
+          "CRM e agenda ganharam o mesmo acabamento do portal: cantos mais suaves, sombras leves, realce ao passar o mouse sobre os cartões e entrada tranquila das telas.",
+          "O símbolo da marca passou a acompanhar o nome no cabeçalho do CRM."
+        ],
+        "Técnico": [
+          "Os links internos levam o número da versão junto, e a tela inicial confere sozinha se o servidor já publicou uma versão mais nova."
+        ]
+      }
+    },
+    {
       versao: "2.0.0",
       codinome: "ALVORADA",
       data: "21/08/2026",

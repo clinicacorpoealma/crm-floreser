@@ -201,17 +201,36 @@
 
   /* ---------------------------------------------------- janelas */
 
+  /* mesma ideia do portal: a rolagem segue o estado real das janelas */
+  function sincronizarRolagem() {
+    document.body.style.overflow = document.querySelector("dialog[open]") ? "hidden" : "";
+  }
+
   function abrir(d) {
     if (typeof d.showModal === "function") d.showModal();
     else d.setAttribute("open", "");
-    document.body.style.overflow = "hidden";
+    sincronizarRolagem();
   }
 
   function fechar(d) {
     if (typeof d.close === "function" && d.open) d.close();
     else d.removeAttribute("open");
-    document.body.style.overflow = "";
+    pararRelogio();
+    sincronizarRolagem();
   }
+
+  function pararRelogio() {
+    if (relogio) { clearInterval(relogio); relogio = null; }
+  }
+
+  /* sair com ESC não passa por fechar(), então o acerto vem logo depois */
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    setTimeout(function () {
+      if (!document.querySelector("dialog[open]")) pararRelogio();
+      sincronizarRolagem();
+    }, 0);
+  });
 
   /* ---------------------------------------------------- painel */
 
@@ -228,6 +247,7 @@
     abrir(dlgPainel);
     trocarAba("visao");
     carregar();
+    pararRelogio();
     relogio = setInterval(function () {
       var el = document.getElementById("relogio");
       if (el) el.textContent = new Date().toLocaleTimeString("pt-BR");
@@ -253,12 +273,11 @@
 
     dlgPainel.querySelector("[data-sai]").addEventListener("click", function () {
       fechar(dlgPainel);
-      if (relogio) { clearInterval(relogio); relogio = null; }
     });
 
     dlgPainel.addEventListener("close", function () {
-      if (relogio) { clearInterval(relogio); relogio = null; }
-      document.body.style.overflow = "";
+      pararRelogio();
+      sincronizarRolagem();
     });
 
     Array.prototype.forEach.call(dlgPainel.querySelectorAll("[data-aba]"), function (b) {

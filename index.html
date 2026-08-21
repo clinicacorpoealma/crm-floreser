@@ -366,6 +366,10 @@
       overflow: hidden;
     }
 
+    dialog:not([open]) {
+      display: none;
+    }
+
     dialog::backdrop {
       background: rgba(30, 50, 48, .5);
     }
@@ -651,6 +655,12 @@
     .painel {
       width: min(1040px, calc(100% - 24px));
       max-height: min(90vh, 860px);
+    }
+
+    /* o display fica preso ao estado aberto: uma regra de autor com display
+       vence a do navegador que esconde dialog fechado, e a janela ficaria
+       desenhada por cima da página depois de fechar */
+    .painel[open] {
       display: flex;
       flex-direction: column;
     }
@@ -1178,16 +1188,23 @@
         });
       }
 
+      /* A rolagem da página segue o estado real das janelas, e não o par
+         abrir/fechar: em alguns navegadores o evento close do <dialog> não
+         chega, e a página ficava travada depois de sair com ESC. */
+      function sincronizarRolagem() {
+        document.body.style.overflow = document.querySelector("dialog[open]") ? "hidden" : "";
+      }
+
       function abrir(dialogo) {
         if (typeof dialogo.showModal === "function") dialogo.showModal();
         else dialogo.setAttribute("open", "");
-        document.body.style.overflow = "hidden";
+        sincronizarRolagem();
       }
 
       function fechar(dialogo) {
         if (typeof dialogo.close === "function" && dialogo.open) dialogo.close();
         else dialogo.removeAttribute("open");
-        document.body.style.overflow = "";
+        sincronizarRolagem();
       }
 
       document.addEventListener("click", function (e) {
@@ -1199,7 +1216,10 @@
         if (e.key !== "Escape") return;
         var abertos = document.querySelectorAll("dialog[open]");
         if (abertos.length && typeof abertos[0].showModal !== "function") fechar(abertos[0]);
+        setTimeout(sincronizarRolagem, 0);
       });
+
+      window.floreserRolagem = sincronizarRolagem;
 
       /* ---------------- data do cabeçalho ---------------- */
 

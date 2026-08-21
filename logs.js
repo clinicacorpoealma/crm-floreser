@@ -318,9 +318,70 @@
     return true;
   }, false);
 
+  /* ---------- versão em cache ----------
+     O GitHub Pages guarda as páginas no navegador por um tempo. Quando sai
+     uma versão nova, o site pode continuar mostrando a antiga. Duas coisas
+     resolvem: os links internos levam a versão junto, e a página confere se
+     o servidor já tem outra. */
+
+  function versaoCurta() {
+    return tentar(function () { return global.FLORESER.atual.versao; }, "");
+  }
+
+  tentar(function () {
+    document.addEventListener("click", function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if (!a || a.target === "_blank" || a.hasAttribute("download")) return;
+
+      var href = a.getAttribute("href") || "";
+      if (!href || href.indexOf("?") >= 0 || /^(https?:|mailto:|tel:|javascript:|#)/i.test(href)) return;
+
+      var v = versaoCurta();
+      if (!v) return;
+
+      e.preventDefault();
+      enviar(true);
+      location.assign(href + "?v=" + encodeURIComponent(v));
+    });
+    return true;
+  }, false);
+
+  function conferirVersao() {
+    var aqui = versaoCurta();
+    if (!aqui) return;
+
+    tentar(function () {
+      fetch("version.js?b=" + Date.now(), { cache: "no-store" })
+        .then(function (r) { return r.text(); })
+        .then(function (txt) {
+          var m = String(txt).match(/versao:\s*"([\d.]+)"/);
+          if (!m || m[1] === aqui) return;
+
+          registrar("VERSAO_DESATUALIZADA", {
+            nivel: "WARNING",
+            mensagem: "A página abriu na v" + aqui + " e o servidor já está na v" + m[1],
+          });
+
+          /* recarrega só o portal, que não tem nada em edição, e uma vez por sessão */
+          if (pagina() === "index.html" && !daArea("sessionStorage", "floreser.recarga")) {
+            paraArea("sessionStorage", "floreser.recarga", "1");
+            setTimeout(function () { location.reload(); }, 400);
+          }
+        })
+        .catch(function () { });
+      return true;
+    }, false);
+  }
+
+  setTimeout(conferirVersao, 4000);
+
   global.FloreSerLogs = {
     registrar: registrar,
     enviar: function () { enviar(false); },
+    versao: versaoCurta,
+    conferir: conferirVersao,
     sessao: retrato,
     estado: function () {
       return { envio: estado.envio, quando: estado.quando, pendentes: fila.length, enviados: enviados };

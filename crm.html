@@ -399,7 +399,33 @@
         input, select, textarea, button { font-family: 'Montserrat', sans-serif; }
         input:focus, select:focus, textarea:focus { outline: 2px solid ${CORES.verde}; outline-offset: 1px; }
         button { cursor: pointer; }
-        @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+        /* acabamento no mesmo tom do portal */
+        .cartao-lead {
+          box-shadow: 0 1px 2px rgba(45,45,45,.04), 0 8px 22px rgba(59,110,106,.07);
+          transition: border-color .2s ease, box-shadow .24s ease, transform .24s ease;
+        }
+        .painel-claro {
+          box-shadow: 0 1px 2px rgba(45,45,45,.04), 0 8px 22px rgba(59,110,106,.07);
+        }
+        .pilula { transition: background .18s ease, color .18s ease; }
+        .acao { transition: background .18s ease, border-color .18s ease, box-shadow .2s ease; }
+
+        @media (hover: hover) {
+          .cartao-lead:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 4px rgba(45,45,45,.05), 0 14px 32px rgba(59,110,106,.13);
+          }
+          .pilula:hover { background: rgba(245,243,238,0.22); }
+          .acao:hover { box-shadow: 0 6px 16px rgba(59,110,106,.18); }
+        }
+
+        @keyframes surgir-crm { from { opacity: 0; transform: translateY(8px); } }
+        main > section { animation: surgir-crm .42s ease both; }
+
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after { animation: none !important; transition: none !important; }
+        }
       `}</style>
 
           <header style={{ background: CORES.floresta, color: CORES.areia, padding: "26px 20px 18px" }}>
@@ -412,9 +438,18 @@
                   ‹ Início
                 </a>
               </div>
-              <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 32, margin: "3px 0 0", lineHeight: 1.1 }}>
-                CRM Flore<span style={{ fontStyle: "italic", color: "#D8C9A5" }}>Ser</span>
-              </h1>
+              <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 3 }}>
+                <img src="logo.png" width="366" height="380" alt=""
+                  style={{ height: 42, width: "auto", filter: "brightness(0) invert(1)", opacity: .9 }} />
+                <div>
+                  <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 32, margin: 0, lineHeight: 1.1 }}>
+                    CRM Flore<span style={{ fontStyle: "italic", color: "#D8C9A5" }}>Ser</span>
+                  </h1>
+                  <div style={{ fontSize: 9.5, letterSpacing: "0.28em", textTransform: "uppercase", color: "#8E9B97", marginTop: 4 }}>
+                    Funil comercial
+                  </div>
+                </div>
+              </div>
               <nav style={{ display: "flex", gap: 6, marginTop: 18, flexWrap: "wrap" }}>
                 {[
                   { id: "funil", rotulo: "Funil" },
@@ -422,7 +457,7 @@
                   { id: "leads", rotulo: `Leads (${ativos.length})` },
                   { id: "config", rotulo: "Cadências" },
                 ].map((t) => (
-                  <button key={t.id} onClick={() => setAba(t.id)}
+                  <button key={t.id} className="pilula" onClick={() => setAba(t.id)}
                     style={{
                       border: "none", borderRadius: 20, padding: "8px 15px", fontSize: 13, fontWeight: 600,
                       background: aba === t.id ? CORES.areia : "rgba(245,243,238,0.12)",
@@ -483,7 +518,7 @@
                 <h3 style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 21, fontWeight: 600, margin: "26px 0 10px" }}>
                   Onde estão os leads agora
                 </h3>
-                <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "6px 16px" }}>
+                <div className="painel-claro" style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "6px 16px" }}>
                   {ETAPAS.filter((e) => !e.arquivo).map((e) => {
                     const qtd = ativos.filter((l) => l.etapa === e.id).length;
                     return (
@@ -535,7 +570,7 @@
                     <option value="todas">Todas as etapas</option>
                     {ETAPAS.filter((e) => !e.arquivo).map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
                   </select>
-                  <button onClick={() => setEditando("novo")}
+                  <button className="acao" onClick={() => setEditando("novo")}
                     style={{ padding: "10px 18px", borderRadius: 8, border: "none", background: CORES.verde, color: CORES.branco, fontWeight: 600, fontSize: 14 }}>
                     + Novo lead
                   </button>
@@ -662,7 +697,7 @@
       const tons = ["#1E3A3A", "#2E5654", "#3B6E6A", "#6E8C6A", "#8C7550"];
 
       return (
-        <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "18px 16px" }}>
+        <div className="painel-claro" style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "18px 16px" }}>
           {etapas.map((e, i) => {
             const largura = Math.max((e.valor / maximo) * 100, e.valor > 0 ? 16 : 8);
             const anterior = i > 0 ? etapas[i - 1].valor : null;
@@ -692,7 +727,7 @@
 
     function Indicador({ rotulo, valor, nota }) {
       return (
-        <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "14px 16px" }}>
+        <div className="painel-claro" style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "14px 16px" }}>
           <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: CORES.suave }}>{rotulo}</div>
           <div style={{ fontFamily: "'Cormorant Garamond', serif", fontSize: 34, fontWeight: 600, color: CORES.floresta, lineHeight: 1.1, marginTop: 2 }}>{valor}</div>
           <div style={{ fontSize: 12, color: CORES.verde }}>{nota}</div>
@@ -728,7 +763,7 @@
       const corSit = s.tipo === "atrasado" ? CORES.atrasado : s.tipo === "hoje" ? CORES.ouro : CORES.verde;
 
       return (
-        <div style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "13px 15px", marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
+        <div className="cartao-lead" style={{ background: CORES.branco, borderRadius: 12, border: `1px solid ${CORES.borda}`, padding: "13px 15px", marginBottom: 10, display: "flex", alignItems: "center", gap: 10 }}>
           <button onClick={aoAbrir} style={{ flex: 1, textAlign: "left", border: "none", background: "none", padding: 0, minWidth: 0 }}>
             <div style={{ fontWeight: 600, fontSize: 15, color: CORES.floresta }}>{lead.nome}</div>
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 5, alignItems: "center" }}>
@@ -1107,6 +1142,7 @@
       const [senha, setSenha] = useState("");
       const [estado, setEstado] = useState("form"); // form | verificando | ok
       const [erro, setErro] = useState("");
+      const [mostrar, setMostrar] = useState(false);
 
       async function entrar() {
         if (!senha.trim()) return;
@@ -1119,7 +1155,7 @@
             SESSAO.rev = r.rev;
             setEstado("ok");
           } else if (r.erro === "senha") {
-            setErro("Senha incorreta.");
+            setErro("Senha incorreta. Confira e tente de novo.");
             setEstado("form");
           } else {
             setErro("Não foi possível conectar à planilha. Verifique a publicação do Apps Script.");
@@ -1133,39 +1169,186 @@
 
       if (estado === "ok") return <CRMFloreSer />;
 
+      const carregando = estado === "verificando";
+
       return (
-        <div style={{ minHeight: "100vh", background: "#1E3A3A", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: 20, fontFamily: "'Montserrat', sans-serif" }}>
-          <style>{`@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Montserrat:wght@400;500;600;700&display=swap');`}</style>
-          <div style={{ background: "#F5F3EE", borderRadius: 16, padding: "34px 28px", width: "100%", maxWidth: 380, textAlign: "center" }}>
-            <img src="logo.png" width="366" height="380" alt="Símbolo FloreSer"
-              style={{ display: "block", height: 58, width: "auto", margin: "0 auto 16px" }} />
-            <div style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "#8C7550", marginBottom: 6 }}>
-              Clínica Corpo e Alma
+        <div className="pt-fundo">
+          <style>{`
+            @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Montserrat:wght@300;400;500;600&display=swap');
+
+            .pt-fundo, .pt-fundo * { box-sizing: border-box; }
+
+            .pt-fundo {
+              position: relative; min-height: 100vh; overflow: hidden;
+              display: flex; flex-direction: column; align-items: center; justify-content: center;
+              gap: 18px; padding: 28px 20px; background: #2E5754;
+              font-family: 'Montserrat', Calibri, system-ui, sans-serif;
+            }
+            .pt-fundo::before {
+              content: ""; position: absolute; right: -140px; bottom: -170px;
+              width: 520px; height: 520px; background: url("logo.png") no-repeat center/contain;
+              opacity: .055; filter: brightness(0) invert(1); pointer-events: none;
+            }
+
+            .pt-cartao {
+              position: relative; width: 100%; max-width: 400px; padding: 42px 38px 32px;
+              background: #F5F0EB; border-radius: 16px; text-align: center;
+              box-shadow: 0 1px 2px rgba(20,40,38,.10), 0 24px 60px rgba(20,40,38,.30);
+              animation: pt-surge .5s cubic-bezier(.2,.8,.2,1) both;
+            }
+            @keyframes pt-surge { from { opacity: 0; transform: translateY(12px); } }
+
+            .pt-marca { display: block; height: 56px; width: auto; margin: 0 auto 20px; }
+            .pt-nome {
+              font-family: 'Cormorant Garamond', Georgia, serif; font-size: 30px; font-weight: 600;
+              color: #3B6E6A; line-height: 1.1; margin: 0;
+            }
+            .pt-nome span { font-style: italic; color: #8C7550; }
+            .pt-tag {
+              margin: 7px 0 0; font-size: 9.5px; font-weight: 300; letter-spacing: .26em;
+              text-transform: uppercase; color: #A39384;
+            }
+            .pt-risco { width: 38px; height: 1px; background: #C9D3CA; margin: 22px auto 24px; }
+
+            .pt-campo { position: relative; display: flex; align-items: center; }
+            .pt-so-leitor { position: absolute; width: 1px; height: 1px; overflow: hidden;
+              clip: rect(0 0 0 0); white-space: nowrap; }
+            .pt-cadeado { position: absolute; left: 14px; color: #A39384; pointer-events: none; }
+            .pt-campo input {
+              width: 100%; padding: 14px 46px 14px 40px; background: #FFFFFF;
+              border: 1px solid #E2DED7; border-radius: 10px; font-size: 15px; color: #2D2D2D;
+              letter-spacing: .02em; text-align: left;
+              transition: border-color .18s ease, box-shadow .18s ease;
+            }
+            .pt-campo input::placeholder { color: #B9B0A6; letter-spacing: .01em; }
+            .pt-campo input:focus {
+              outline: none; border-color: #5A9490; box-shadow: 0 0 0 3px rgba(90,148,144,.16);
+            }
+
+            .pt-olho {
+              position: absolute; right: 6px; width: 34px; height: 34px; display: flex;
+              align-items: center; justify-content: center; border: none; border-radius: 8px;
+              background: none; color: #A39384; cursor: pointer;
+              transition: color .18s ease, background .18s ease;
+            }
+            .pt-olho:hover { color: #3B6E6A; background: rgba(201,211,202,.45); }
+            .pt-olho:focus-visible { outline: 2px solid #5A9490; outline-offset: 1px; }
+
+            .pt-erro {
+              display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 12px;
+              border-radius: 8px; background: #F6EBE4; color: #A8623F; font-size: 12.5px;
+              line-height: 1.45; text-align: left; animation: pt-surge .26s ease both;
+            }
+            .pt-erro svg { flex: 0 0 auto; margin-top: 1px; }
+
+            .pt-entrar {
+              width: 100%; margin-top: 16px; padding: 13px; border: none; border-radius: 10px;
+              background: #3B6E6A; color: #fff; font-family: inherit; font-size: 13.5px;
+              font-weight: 600; letter-spacing: .06em; display: flex; align-items: center;
+              justify-content: center; gap: 10px;
+              transition: background .18s ease, box-shadow .2s ease, transform .15s ease;
+            }
+            .pt-entrar:hover:not([disabled]) {
+              background: #5A9490; box-shadow: 0 8px 20px rgba(59,110,106,.28);
+            }
+            .pt-entrar:active:not([disabled]) { transform: translateY(1px); }
+            .pt-entrar:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+            .pt-entrar[disabled] { opacity: .72; cursor: default; box-shadow: none; }
+            .pt-entrar.carregando::after {
+              content: ""; width: 14px; height: 14px; border-radius: 50%;
+              border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+              animation: pt-gira .7s linear infinite;
+            }
+            @keyframes pt-gira { to { transform: rotate(360deg); } }
+
+            .pt-volta {
+              font-size: 9.5px; font-weight: 300; letter-spacing: .22em; text-transform: uppercase;
+              color: rgba(255,255,255,.72); text-decoration: none; padding: 8px 12px;
+              border-radius: 8px; transition: color .18s ease, background .18s ease;
+            }
+            .pt-volta:hover { color: #fff; background: rgba(255,255,255,.08); }
+            .pt-volta:focus-visible { outline: 2px solid rgba(255,255,255,.55); outline-offset: 2px; }
+
+            @media (max-width: 480px) {
+              .pt-cartao { padding: 34px 24px 28px; border-radius: 14px; }
+              .pt-marca { height: 48px; margin-bottom: 16px; }
+              .pt-nome { font-size: 26px; }
+              .pt-risco { margin: 18px auto 20px; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+              .pt-cartao, .pt-erro { animation: none; }
+              .pt-entrar.carregando::after { animation: none; }
+            }
+          `}</style>
+
+          <div className="pt-cartao">
+            <img className="pt-marca" src="logo.png" width="366" height="380" alt="Símbolo FloreSer" />
+            <h1 className="pt-nome">CRM Flore<span>Ser</span></h1>
+            <p className="pt-tag">Clínica Corpo e Alma</p>
+            <div className="pt-risco"></div>
+
+            <div className="pt-campo">
+              <label className="pt-so-leitor" htmlFor="pt-senha">Senha de acesso</label>
+              <svg className="pt-cadeado" width="15" height="15" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden="true">
+                <rect x="4.5" y="10.5" width="15" height="10" rx="2.5" />
+                <path d="M8.2 10.5V7.8a3.8 3.8 0 0 1 7.6 0v2.7" />
+              </svg>
+
+              <input
+                id="pt-senha"
+                type={mostrar ? "text" : "password"}
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") entrar(); }}
+                placeholder="Senha de acesso"
+                autoComplete="current-password"
+                disabled={carregando}
+                autoFocus
+              />
+
+              <button type="button" className="pt-olho"
+                onClick={() => setMostrar(!mostrar)}
+                aria-pressed={mostrar}
+                aria-label={mostrar ? "Ocultar senha" : "Mostrar senha"}>
+                {mostrar ? (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M2.5 12S6.1 5.5 12 5.5c1.6 0 3 .3 4.3.9M21.5 12s-3.6 6.5-9.5 6.5c-1.7 0-3.1-.3-4.4-.9" />
+                    <path d="M9.7 9.8a3 3 0 0 0 4.2 4.2" />
+                    <path d="M4.2 19.8 19.8 4.2" />
+                  </svg>
+                ) : (
+                  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M2.5 12S6.1 5.5 12 5.5 21.5 12 21.5 12 17.9 18.5 12 18.5 2.5 12 2.5 12Z" />
+                    <circle cx="12" cy="12" r="2.8" />
+                  </svg>
+                )}
+              </button>
             </div>
-            <h1 style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontSize: 32, margin: "0 0 22px", color: "#1E3A3A" }}>
-              CRM Flore<span style={{ fontStyle: "italic", color: "#8C7550" }}>Ser</span>
-            </h1>
-            <input
-              type="password"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") entrar(); }}
-              placeholder="Senha de acesso"
-              disabled={estado === "verificando"}
-              style={{ width: "100%", padding: "12px 0px" /*Deixe o padding lateral em 0px*/, borderRadius: 8, border: "1px solid #D8D2C4", fontSize: 15, textAlign: "center", fontFamily: "'Montserrat', sans-serif" }}
-            />
-            {erro && <div style={{ color: "#A3543A", fontSize: 13, marginTop: 10 }}>{erro}</div>}
+
+            {erro && (
+              <div className="pt-erro" role="alert">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="1.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 3.8 21 19.5H3L12 3.8Z" />
+                  <path d="M12 10v4M12 16.6v.4" />
+                </svg>
+                <span>{erro}</span>
+              </div>
+            )}
+
             <button
+              className={carregando ? "pt-entrar carregando" : "pt-entrar"}
               onClick={entrar}
-              disabled={estado === "verificando" || !senha.trim()}
-              style={{ width: "100%", marginTop: 14, padding: "12px", borderRadius: 8, border: "none", background: "#3B6E6A", color: "#fff", fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: estado === "verificando" || !senha.trim() ? 0.6 : 1, fontFamily: "'Montserrat', sans-serif" }}
+              disabled={carregando || !senha.trim()}
             >
-              {estado === "verificando" ? "Conectando…" : "Entrar"}
+              {carregando ? "Conectando…" : "Entrar"}
             </button>
           </div>
-          <a href="index.html" style={{ marginTop: 18, fontSize: 11, letterSpacing: "0.18em", textTransform: "uppercase", color: "#C9BFA8", textDecoration: "none" }}>
-            ‹ Início
-          </a>
+
+          <a className="pt-volta" href="index.html">‹ Início</a>
         </div>
       );
     }
